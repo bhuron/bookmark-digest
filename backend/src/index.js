@@ -2,12 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getConfig } from './config.js';
 import logger from './utils/logger.js';
 import { validateApiKey } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { initializeDatabase } from './database/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Import routes
 import articlesRouter from './routes/articles.js';
@@ -17,26 +22,20 @@ import tagsRouter from './routes/tags.js';
 const app = express();
 const PORT = getConfig('PORT', 3000);
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"]
-    }
-  },
-  hsts: false // Disable for localhost
+// CORS configuration (must come before other middleware)
+const corsOrigin = getConfig('CORS_ORIGIN', 'http://localhost:5174');
+app.use(cors({
+  origin: [corsOrigin, 'http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
 }));
 
-// CORS configuration
-const corsOrigin = getConfig('CORS_ORIGIN', 'http://localhost:5173');
-app.use(cors({
-  origin: [corsOrigin, 'http://localhost:3000'],
-  credentials: true,
-  optionsSuccessStatus: 200
+// Security middleware (configure to not interfere with CORS)
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for development
+  hsts: false // Disable for localhost
 }));
 
 // Body parsing middleware
@@ -65,6 +64,10 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Serve static images (no auth required for images)
+const imagesDir = path.join(__dirname, '../images');
+app.use('/images', express.static(imagesDir));
 
 // API routes with authentication
 app.use('/api/articles', validateApiKey, apiLimiter, articlesRouter);

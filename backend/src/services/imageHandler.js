@@ -10,10 +10,10 @@ const __dirname = path.dirname(__filename);
 
 class ImageHandler {
   constructor() {
-    this.timeout = getConfig('IMAGE_TIMEOUT_MS', 10000);
-    this.maxSize = (getConfig('MAX_IMAGE_SIZE_MB', 5)) * 1024 * 1024;
+    this.timeout = parseInt(getConfig('IMAGE_TIMEOUT_MS', 10000));
+    this.maxSize = parseInt(getConfig('MAX_IMAGE_SIZE_MB', 5)) * 1024 * 1024;
     this.supportedFormats = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    this.imageQuality = getConfig('IMAGE_QUALITY', 85);
+    this.imageQuality = parseInt(getConfig('IMAGE_QUALITY', 85));
     this.baseImagesDir = path.join(__dirname, '../../images');
   }
 
@@ -21,8 +21,15 @@ class ImageHandler {
    * Download and replace images in HTML content
    */
   async downloadAndReplaceImages(html, baseUrl, articleTitle) {
-    const { JSDOM } = await import('jsdom');
-    const dom = new JSDOM(html);
+    const { JSDOM, VirtualConsole } = await import('jsdom');
+    
+    // Suppress JSDOM console errors
+    const virtualConsole = new VirtualConsole();
+    virtualConsole.on('error', () => {
+      // Silently ignore CSS parsing and other JSDOM errors
+    });
+    
+    const dom = new JSDOM(html, { virtualConsole });
     const doc = dom.window.document;
     const images = doc.querySelectorAll('img');
     const downloadedImages = [];
@@ -52,7 +59,7 @@ class ImageHandler {
         const localPath = await this._downloadImage(src, baseUrl, articleDir, i);
 
         // Update image src to relative path
-        img.src = localPath;
+        img.setAttribute('src', localPath);
 
         downloadedImages.push({
           originalUrl: src,
@@ -163,8 +170,8 @@ class ImageHandler {
     // Save to disk
     await fs.writeFile(localPath, optimizedBuffer);
 
-    // Return relative path for EPUB usage
-    return `images/${path.basename(articleDir)}/${filename}`;
+    // Return absolute path for web display (will be served at /images/)
+    return `/images/${path.basename(articleDir)}/${filename}`;
   }
 
   /**

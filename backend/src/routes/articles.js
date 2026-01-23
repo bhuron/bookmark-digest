@@ -63,7 +63,7 @@ router.get('/',
   validationRules.listArticles,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, tag, search, is_archived, is_favorite } = req.query;
+    const { page = 1, limit = 20, tag, search, is_archived, is_favorite, sort_by = 'created_at' } = req.query;
     const offset = (page - 1) * limit;
 
     const db = getConnection();
@@ -95,16 +95,36 @@ router.get('/',
 
     const whereClause = whereConditions.join(' AND ');
 
+    // Build ORDER BY clause
+    let orderBy = 'a.created_at DESC';
+    switch (sort_by) {
+      case 'created_at_asc':
+        orderBy = 'a.created_at ASC';
+        break;
+      case 'title':
+        orderBy = 'a.title ASC';
+        break;
+      case 'title_desc':
+        orderBy = 'a.title DESC';
+        break;
+      case 'reading_time':
+        orderBy = 'a.reading_time_minutes ASC';
+        break;
+      case 'created_at':
+      default:
+        orderBy = 'a.created_at DESC';
+        break;
+    }
+
     // Fetch articles
     const articles = db.prepare(`
-      SELECT DISTINCT a.*,
-        GROUP_CONCAT(t.name) as tags
+      SELECT DISTINCT a.*
       FROM articles a
       LEFT JOIN article_tags at ON a.id = at.article_id
       LEFT JOIN tags t ON at.tag_id = t.id
       WHERE ${whereClause}
       GROUP BY a.id
-      ORDER BY a.created_at DESC
+      ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
 
@@ -117,23 +137,73 @@ router.get('/',
       WHERE ${whereClause}
     `).get(...params);
 
-    // Parse tags for each article
-    const articlesWithTags = articles.map(article => ({
-      ...article,
-      tags: article.tags ? article.tags.split(',') : [],
-      has_images: Boolean(article.has_images),
-      is_archived: Boolean(article.is_archived),
-      is_favorite: Boolean(article.is_favorite)
-    }));
+    // Get tags for each article
+    const articlesWithTags = articles.map(article => {
+      const tags = db.prepare(`
+        SELECT t.id, t.name, t.color
+        FROM tags t
+        INNER JOIN article_tags at ON t.id = at.tag_id
+        WHERE at.article_id = ?
+        ORDER BY t.name
+      `).all(article.id);
+
+      return {
+        ...article,
+        tags,
+        has_images: Boolean(article.has_images),
+        is_archived: Boolean(article.is_archived),
+        is_favorite: Boolean(article.is_favorite)
+      };
+    });
 
     res.json({
-      articles: articlesWithTags,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: countResult.total,
-        totalPages: Math.ceil(countResult.total / limit)
+      data: {
+        articles: articlesWithTags,
+        total: countResult.total
       }
+    });
+  })
+);
+
+/**
+ * GET /api/articles/stats
+ * Get statistics
+ */
+router.get('/stats',
+  asyncHandler(async (req, res) => {
+    const db = getConnection();
+
+    const stats = db.prepare(`
+      SELECT
+        COUNT(*) as total_articles,
+        SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_articles,
+        SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) as favorite_articles,
+        SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END) as unread_articles,
+        SUM(CASE WHEN has_images = 1 THEN 1 ELSE 0 END) as articles_with_images,
+        SUM(word_count) as total_words,
+        SUM(reading_time_minutes) as total_reading_time
+      FROM articles
+      WHERE capture_success = 1
+    `).get();
+
+    const tagStats = db.prepare(`
+      SELECT t.name, COUNT(at.article_id) as article_count
+      FROM tags t
+      LEFT JOIN article_tags at ON t.id = at.tag_id
+      GROUP BY t.id
+      ORDER BY article_count DESC
+      LIMIT 20
+    `).all();
+
+    res.json({
+      total_articles: stats.total_articles || 0,
+      archived_articles: stats.archived_articles || 0,
+      favorite_articles: stats.favorite_articles || 0,
+      unread_articles: stats.unread_articles || 0,
+      articles_with_images: stats.articles_with_images || 0,
+      total_words: stats.total_words || 0,
+      total_reading_time: stats.total_reading_time || 0,
+      popular_tags: tagStats
     });
   })
 );
@@ -150,13 +220,9 @@ router.get('/:id',
     const db = getConnection();
 
     const article = db.prepare(`
-      SELECT a.*,
-        GROUP_CONCAT(t.name) as tags
+      SELECT a.*
       FROM articles a
-      LEFT JOIN article_tags at ON a.id = at.article_id
-      LEFT JOIN tags t ON at.tag_id = t.id
       WHERE a.id = ?
-      GROUP BY a.id
     `).get(id);
 
     if (!article) {
@@ -166,10 +232,19 @@ router.get('/:id',
       });
     }
 
+    // Get tags for this article
+    const tags = db.prepare(`
+      SELECT t.id, t.name, t.color
+      FROM tags t
+      INNER JOIN article_tags at ON t.id = at.tag_id
+      WHERE at.article_id = ?
+      ORDER BY t.name
+    `).all(id);
+
     res.json({
       article: {
         ...article,
-        tags: article.tags ? article.tags.split(',') : [],
+        tags,
         has_images: Boolean(article.has_images),
         is_archived: Boolean(article.is_archived),
         is_favorite: Boolean(article.is_favorite)
@@ -351,42 +426,6 @@ router.delete('/:id/tags/:tagId',
     res.json({
       success: true,
       message: 'Tag removed successfully'
-    });
-  })
-);
-
-/**
- * GET /api/articles/stats
- * Get statistics
- */
-router.get('/stats',
-  asyncHandler(async (req, res) => {
-    const db = getConnection();
-
-    const stats = db.prepare(`
-      SELECT
-        COUNT(*) as total_articles,
-        SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_articles,
-        SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) as favorite_articles,
-        SUM(CASE WHEN has_images = 1 THEN 1 ELSE 0 END) as articles_with_images,
-        SUM(word_count) as total_words,
-        SUM(reading_time_minutes) as total_reading_time
-      FROM articles
-      WHERE capture_success = 1
-    `).get();
-
-    const tagStats = db.prepare(`
-      SELECT t.name, COUNT(at.article_id) as article_count
-      FROM tags t
-      LEFT JOIN article_tags at ON t.id = at.tag_id
-      GROUP BY t.id
-      ORDER BY article_count DESC
-      LIMIT 20
-    `).all();
-
-    res.json({
-      stats,
-      popularTags: tagStats
     });
   })
 );

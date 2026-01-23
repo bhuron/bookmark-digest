@@ -1,5 +1,5 @@
 import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 import createDOMPurify from 'dompurify';
 import { getConnection } from '../database/index.js';
 import imageHandler from './imageHandler.js';
@@ -30,7 +30,16 @@ class ArticleProcessor {
 
     let dom;
     try {
-      dom = new JSDOM(html, { url });
+      // Suppress JSDOM console errors (CSS parsing errors, etc.)
+      const virtualConsole = new VirtualConsole();
+      virtualConsole.on('error', () => {
+        // Silently ignore CSS parsing and other JSDOM errors
+      });
+      
+      dom = new JSDOM(html, {
+        url,
+        virtualConsole
+      });
     } catch (error) {
       logger.error('JSDOM parsing failed', { url, error: error.message });
       throw new Error(`Failed to parse HTML: ${error.message}`);
@@ -65,7 +74,11 @@ class ArticleProcessor {
 
     // Sanitize HTML to remove malicious content
     const DOMPurify = createDOMPurify(dom.window);
-    const sanitizedContent = DOMPurify.sanitize(article.content);
+    const sanitizedContent = DOMPurify.sanitize(article.content, {
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'width', 'height', 'class', 'style', 'loading', 'target', 'rel', 'data-*'],
+      ADD_TAGS: ['figure', 'figcaption'],
+      ADD_ATTR: ['loading', 'target', 'rel', 'data-*']
+    });
 
     // Download and process images if enabled
     let processedHtml = sanitizedContent;
