@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { tagsApi } from '../services/api';
-import { Plus, Trash2, Edit2, FileText, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, FileText } from 'lucide-react';
 
 export default function Tags() {
   const navigate = useNavigate();

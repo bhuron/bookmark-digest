@@ -1,17 +1,21 @@
-import { Epub as EPub } from '@storyteller-platform/epub';
+import { EPub } from '@lesjoursfr/html-to-epub';
 import path from 'path';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import { fileURLToPath } from 'url';
+
 import logger from '../utils/logger.js';
 import { getConfig } from '../config.js';
 import { getConnection } from '../database/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+
 
 class EPUBGenerator {
   constructor() {
     this.outputDir = getConfig('EPUB_EXPORT_DIR', './epub-exports');
+    this.imagesDir = path.join(__dirname, '../../images');
     this.ensureOutputDir();
   }
 
@@ -52,175 +56,180 @@ class EPUBGenerator {
       title: options.title
     });
 
-    try {
-      // Create EPUB instance
-      const epub = await EPub.create({
-        title: options.title || `Bookmark Digest - ${new Date().toLocaleDateString()}`,
-        author: options.author || 'Bookmark Digest',
-        publisher: 'Bookmark Digest',
-        language: 'en',
-        identifier: `bookmark-digest-${Date.now()}`
-      });
+     try {
+       // Generate filename
+       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+       const safeTitle = this._sanitizeFilename(options.title || 'bookmark-digest');
+       const filename = `${safeTitle}-${timestamp}.epub`;
+       const filepath = path.join(this.outputDir, filename);
 
-      // Add cover if provided
-      if (options.cover && await this._fileExists(options.cover)) {
-        try {
-          await epub.addCover(options.cover);
-          logger.debug('Cover added to EPUB');
-        } catch (error) {
-          logger.warn('Failed to add cover', { error: error.message });
-        }
-      }
+       // Prepare CSS (extract from chapter template)
+       const css = this._prepareCss();
+       
+       // Prepare content array for EPUB
+       const content = [];
+       for (let i = 0; i < articles.length; i++) {
+         const article = articles[i];
+         const chapterHtml = this._prepareArticleContent(article, i + 1);
+         
+         content.push({
+           title: article.title,
+           data: chapterHtml,
+           author: article.author ? [article.author] : [],
+           filename: `chapter-${i + 1}`
+         });
+         
+         logger.debug('Chapter prepared', {
+           chapter: i + 1,
+           title: article.title
+         });
+       }
+       
+       // EPUB options
+       const epubOptions = {
+         title: options.title || `Bookmark Digest - ${new Date().toLocaleDateString()}`,
+         description: `Collection of ${articles.length} articles from Bookmark Digest`,
+         author: options.author || 'Bookmark Digest',
+         lang: 'en-US',
+         date: new Date().toISOString(),
+         version: 3,
+         css,
+         content,
+         // Disable audio/video downloads
+         downloadAudioVideoFiles: false,
+         // Optional cover
+         cover: options.cover && await this._fileExists(options.cover) ? options.cover : null
+       };
+       
+       // Create and render EPUB
+       const epub = new EPub(epubOptions, filepath);
+       await epub.render();
+       
+       logger.info('EPUB written to disk', { filepath });
 
-      // Add each article as a chapter
-      for (let i = 0; i < articles.length; i++) {
-        const article = articles[i];
-        const chapterHtml = this._prepareChapter(article, i + 1);
+       // Get file stats
+       const stats = await fs.stat(filepath);
 
-        await epub.addChapter({
-          title: article.title,
-          content: chapterHtml,
-          fileName: `chapter-${i + 1}.xhtml`
-        });
+       // Save export record to database
+       const exportStmt = db.prepare(`
+         INSERT INTO epub_exports
+         (name, article_count, file_path, file_size)
+         VALUES (?, ?, ?, ?)
+         RETURNING id
+       `);
 
-        logger.debug('Chapter added', {
-          chapter: i + 1,
-          title: article.title
-        });
-      }
+       const exportResult = exportStmt.get(
+         options.title || `Bookmark Digest - ${new Date().toLocaleDateString()}`,
+         articles.length,
+         filepath,
+         stats.size
+       );
 
-      // Add table of contents
-      await epub.addTOC();
-      logger.debug('Table of contents added');
+       logger.info('EPUB generation completed', {
+         exportId: exportResult.id,
+         filename,
+         size: stats.size,
+         articleCount: articles.length
+       });
 
-      // Generate filename
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const safeTitle = this._sanitizeFilename(options.title || 'bookmark-digest');
-      const filename = `${safeTitle}-${timestamp}.epub`;
-      const filepath = path.join(this.outputDir, filename);
-
-      // Write EPUB to disk
-      await epub.write(filepath);
-      logger.info('EPUB written to disk', { filepath });
-
-      // Get file stats
-      const stats = await fs.stat(filepath);
-
-      // Save export record to database
-      const exportStmt = db.prepare(`
-        INSERT INTO epub_exports
-        (name, article_count, file_path, file_size)
-        VALUES (?, ?, ?, ?)
-        RETURNING id
-      `);
-
-      const exportResult = exportStmt.get(
-        options.title || `Bookmark Digest - ${new Date().toLocaleDateString()}`,
-        articles.length,
-        filepath,
-        stats.size
-      );
-
-      logger.info('EPUB generation completed', {
-        exportId: exportResult.id,
-        filename,
-        size: stats.size,
-        articleCount: articles.length
-      });
-
-      return {
-        id: exportResult.id,
-        filename,
-        filepath,
-        size: stats.size,
-        articleCount: articles.length,
-        title: options.title
-      };
-    } catch (error) {
-      logger.error('EPUB generation failed', {
-        error: error.message,
-        articleCount: articles.length
-      });
-      throw error;
-    }
+       return {
+         id: exportResult.id,
+         filename,
+         filepath,
+         size: stats.size,
+         articleCount: articles.length,
+         title: options.title
+       };
+     } catch (error) {
+       logger.error('EPUB generation failed', {
+         error: error.message,
+         articleCount: articles.length
+       });
+       throw error;
+     }
   }
 
   /**
    * Prepare chapter HTML with styling
    */
-  _prepareChapter(article, chapterNumber) {
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>${this._escapeHtml(article.title)}</title>
-    <style type="text/css">
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Georgia, serif;
-        line-height: 1.6;
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        color: #333;
-      }
-      h1 {
-        border-bottom: 2px solid #eee;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        font-size: 1.8em;
-      }
-      h2, h3, h4, h5, h6 {
-        margin-top: 1.5em;
-        margin-bottom: 0.8em;
-      }
-      p {
-        margin-bottom: 1em;
-      }
-      img {
-        max-width: 100%;
-        height: auto;
-        display: block;
-        margin: 1.5em auto;
-      }
-      pre {
-        background: #f4f4f4;
-        padding: 1em;
-        overflow-x: auto;
-        border-radius: 4px;
-      }
-      code {
-        background: #f4f4f4;
-        padding: 0.2em 0.4em;
-        border-radius: 3px;
-      }
-      blockquote {
-        border-left: 4px solid #ddd;
-        padding-left: 1em;
-        margin: 1.5em 0;
-        color: #666;
-      }
-      a {
-        color: #0066cc;
-        text-decoration: none;
-      }
-      a:hover {
-        text-decoration: underline;
-      }
-      .metadata {
-        color: #666;
-        font-size: 0.9em;
-        margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
-      }
-      .original-url {
-        word-break: break-all;
-        font-size: 0.8em;
-        color: #888;
-      }
-    </style>
-  </head>
-  <body>
+
+
+
+
+   /**
+   * Prepare CSS for EPUB
+   */
+  _prepareCss() {
+    return `body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Georgia, serif;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  color: #333;
+}
+h1 {
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  font-size: 1.8em;
+}
+h2, h3, h4, h5, h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+}
+p {
+  margin-bottom: 1em;
+}
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1.5em auto;
+}
+pre {
+  background: #f4f4f4;
+  padding: 1em;
+  overflow-x: auto;
+  border-radius: 4px;
+}
+code {
+  background: #f4f4f4;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 1em;
+  margin: 1.5em 0;
+  color: #666;
+}
+a {
+  color: #0066cc;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+.metadata {
+  color: #666;
+  font-size: 0.9em;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+.original-url {
+  word-break: break-all;
+  font-size: 0.8em;
+  color: #888;
+}`;
+  }
+
+   /**
+   * Prepare article content HTML fragment (without XHTML wrapper)
+   */
+  _prepareArticleContent(article, chapterNumber) {
+    return `
     <h1>Chapter ${chapterNumber}: ${this._escapeHtml(article.title)}</h1>
     <div class="metadata">
       ${article.author ? `<p><strong>Author:</strong> ${this._escapeHtml(article.author)}</p>` : ''}
@@ -229,10 +238,8 @@ class EPUBGenerator {
       <p class="original-url"><strong>Original URL:</strong> ${this._escapeHtml(article.url)}</p>
     </div>
     <div class="content">
-      ${article.content_html}
-    </div>
-  </body>
-</html>`;
+      ${this._htmlToXhtml(article.content_html)}
+    </div>`;
   }
 
   /**
@@ -248,6 +255,94 @@ class EPUBGenerator {
       "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+    /**
+   * Convert HTML to well-formed XHTML for EPUB
+   */
+  _htmlToXhtml(html) {
+    if (!html) return '';
+    
+    let xhtml = html;
+    
+    // Replace HTML entities that are not valid in XML
+    xhtml = xhtml.replace(/&nbsp;/g, '&#160;');
+    xhtml = xhtml.replace(/&ndash;/g, '&#8211;');
+    xhtml = xhtml.replace(/&mdash;/g, '&#8212;');
+    xhtml = xhtml.replace(/&lsquo;/g, '&#8216;');
+    xhtml = xhtml.replace(/&rsquo;/g, '&#8217;');
+    xhtml = xhtml.replace(/&ldquo;/g, '&#8220;');
+    xhtml = xhtml.replace(/&rdquo;/g, '&#8221;');
+    xhtml = xhtml.replace(/&hellip;/g, '&#8230;');
+    
+    // Process images: extract from picture tags, convert paths to absolute URLs
+    xhtml = this._processImagesInHtml(xhtml);
+    
+    // Close self-closing tags (void elements in HTML)
+    const voidElements = ['br', 'hr', 'meta', 'link', 'input', 'area', 'base', 'col', 'command', 'embed', 'keygen', 'param', 'track', 'wbr'];
+    voidElements.forEach(tag => {
+      const regex = new RegExp(`<${tag}([^>]*)(?<!/)>`, 'gi');
+      xhtml = xhtml.replace(regex, `<${tag}$1/>`);
+    });
+    
+    return xhtml;
+  }
+
+  /**
+   * Process images in HTML for EPUB generation
+   */
+  _processImagesInHtml(html) {
+    let processed = html;
+    
+    // Extract img from picture tags and remove picture/source wrappers
+    // <picture><source...><img...></picture> -> <img...>
+    processed = processed.replace(/<picture[^>]*>([\s\S]*?)<\/picture>/gi, (match, inner) => {
+      // Extract img tag from inner HTML
+      const imgMatch = inner.match(/<img[^>]*>/i);
+      return imgMatch ? imgMatch[0] : '';
+    });
+    
+    // Remove source tags (not needed for EPUB)
+    processed = processed.replace(/<source[^>]*>/gi, '');
+    
+    // Convert image src paths to file:// URLs for EPUB library to download
+    processed = processed.replace(/<img([^>]*)>/gi, (match, attributes) => {
+      // Parse src attribute
+      const srcMatch = attributes.match(/src\s*=\s*['"]([^'"]*)['"]/i);
+      if (srcMatch) {
+        let src = srcMatch[1];
+        // Convert /images/ paths to file:// URLs
+        if (src.startsWith('/images/')) {
+          // Remove leading /images/ to get relative path
+          const relativePath = src.substring('/images/'.length);
+          const absolutePath = path.join(this.imagesDir, relativePath);
+          // Check if file exists
+          try {
+            fsSync.accessSync(absolutePath, fsSync.constants.R_OK);
+            // Use absolute file path (library may handle local files)
+            src = absolutePath;
+            logger.info('Converting image path to absolute file path', { 
+              originalSrc: srcMatch[1], 
+              filePath: src,
+              absolutePath 
+            });
+            // Update the src attribute
+            return `<img${attributes.replace(srcMatch[0], `src="${src}"`)}>`;
+          } catch (error) {
+            logger.warn('Image file not found, removing img tag', { 
+              path: absolutePath,
+              originalSrc: src,
+              error: error.message 
+            });
+            return ''; // Remove image if file doesn't exist
+          }
+        }
+        // Keep other src as-is (data URIs, http/https URLs, file:// URLs)
+      }
+      return match;
+    });
+    
+    return processed;
   }
 
   /**

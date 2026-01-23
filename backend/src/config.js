@@ -21,7 +21,7 @@ export function ensureConfig() {
     try {
       config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
     } catch (error) {
-      console.error('Failed to parse config.json, creating new config');
+      console.error('Failed to parse config.json, creating new config:', error.message);
       config = {};
     }
   }

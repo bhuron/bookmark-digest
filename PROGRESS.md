@@ -260,6 +260,36 @@
 4. **Missing db import in epub route**
    - Added `const db = getConnection()` to send-to-kindle route
 
+### ✅ Recent Image & Typography Fixes
+
+**Broken Image Display Issue:**
+- **Root Cause 1**: Image paths missing leading slash (e.g., `images/article/...` instead of `/images/article/...`)
+- **Root Cause 2**: Missing frontend proxy for `/images` requests
+- **Root Cause 3**: CSS parsing errors in JSDOM causing article processing failures
+
+**Fixes Applied:**
+1. **Backend (`imageHandler.js`)**:
+   - Fixed image path generation to use `setAttribute('src', localPath)` instead of `img.src = localPath`
+   - Added leading slash to all generated image paths
+
+2. **Database Updates**:
+   - Updated existing `article_images` table: Added leading slash to all `local_path` entries
+   - Updated existing `articles.content_html`: Changed `src="images/` to `src="/images/` in all saved articles
+
+3. **Frontend (`vite.config.js`)**:
+   - Added proxy configuration for `/images` path to route image requests to backend server
+
+4. **CSS Parsing Error Fix**:
+   - Removed `resources: 'usable'` from JSDOM configuration
+   - Added `VirtualConsole` to suppress CSS parsing errors in `articleProcessor.js` and `imageHandler.js`
+   - Updated DOMPurify configuration to preserve HTML attributes (`class`, `style`, `data-*`, etc.)
+
+5. **Improved Article Typography**:
+   - Installed `@tailwindcss/typography` plugin for better article rendering
+   - Enhanced Tailwind configuration with typography settings
+   - Updated ArticleViewer component with `prose-lg prose-headings:font-semibold` classes
+   - Better link colors with `prose-a:text-primary-600`
+
 ### ⚠️ Known Warnings (Cosmetic)
 
 **NPM Deprecation Warnings:**
@@ -344,7 +374,7 @@ UI runs on http://localhost:5174
 - ✅ Frontend UI for managing articles
 - ✅ EPUB generation and Kindle integration
 
-The application is ready for use. Phase 9 (Testing) can be added later for production hardening.
+The application is ready for use with all core features implemented. Recent fixes have resolved image display issues and improved article typography. Phase 9 (Testing) can be added later for production hardening.
 
 ## Files Created Summary
 
@@ -372,9 +402,10 @@ The application is ready for use. Phase 9 (Testing) can be added later for produ
 - Icons: icon.svg, 3 PNG sizes, generate-icons.js
 - Docs: README.md
 
-**Documentation (3 files):**
+**Documentation (4 files):**
 - README.md
 - PROJECT_PLAN.md
 - PROGRESS.md (this file)
+- AGENTS.md (agent guidance)
 
-**Total:** 58 implementation files + 3 documentation files = 61 files
+**Total:** 58 implementation files + 4 documentation files = 62 files

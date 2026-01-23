@@ -1,5 +1,5 @@
 import express from 'express';
-import { validateRequest, validationRules } from '../middleware/validation.js';
+import { validateRequest } from '../middleware/validation.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { getConnection } from '../database/index.js';
 import logger from '../utils/logger.js';

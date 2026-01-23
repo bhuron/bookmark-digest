@@ -1,12 +1,11 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+
 import { getConfig } from '../config.js';
 import logger from '../utils/logger.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 // Database connection singleton
 let db = null;

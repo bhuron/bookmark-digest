@@ -1,4 +1,5 @@
-import { body, param, query, validationResult } from 'express-validator';
+import pkg from 'express-validator';
+const { body, param, query, validationResult } = pkg;
 import logger from '../utils/logger.js';
 
 /**
@@ -108,6 +109,43 @@ export const validationRules = {
       .trim()
       .isLength({ min: 1, max: 100 })
       .withMessage('Author must be 1-100 characters')
+  ],
+
+  // SMTP settings validation
+  updateSmtpSettings: [
+    body('kindleEmail')
+      .isEmail()
+      .withMessage('Valid Kindle email required'),
+    body('smtpHost')
+      .notEmpty()
+      .withMessage('SMTP host is required')
+      .isString()
+      .isLength({ max: 255 })
+      .withMessage('SMTP host too long'),
+    body('smtpPort')
+      .optional()
+      .isInt({ min: 1, max: 65535 })
+      .withMessage('Valid port number required (1-65535)'),
+    body('smtpSecure')
+      .optional()
+      .custom(value => value === 'true' || value === 'false' || value === true || value === false)
+      .withMessage('SMTP secure must be true or false'),
+    body('smtpUser')
+      .notEmpty()
+      .withMessage('SMTP username is required')
+      .isString()
+      .isLength({ max: 255 })
+      .withMessage('SMTP username too long'),
+    body('smtpPassword')
+      .notEmpty()
+      .withMessage('SMTP password is required')
+      .isString()
+      .isLength({ max: 255 })
+      .withMessage('SMTP password too long'),
+    body('fromEmail')
+      .optional()
+      .isEmail()
+      .withMessage('Valid from email required')
   ]
 };
 

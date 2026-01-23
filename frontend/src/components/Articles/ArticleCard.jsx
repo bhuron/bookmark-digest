@@ -8,7 +8,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatRelativeTime, formatReadingTime, formatWordCount } from '../../utils/format';
-import { cn } from '../../utils/cn';
+
 
 export default function ArticleCard({ article }) {
   return (

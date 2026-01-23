@@ -1,13 +1,12 @@
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
+
 import logger from '../utils/logger.js';
 import { getConfig } from '../config.js';
 import { getConnection } from '../database/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
 
 class KindleService {
   constructor() {

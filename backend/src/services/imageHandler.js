@@ -73,7 +73,7 @@ class ImageHandler {
           originalUrl: src,
           localPath
         });
-      } catch (error) {
+    } catch (error) {
         logger.warn('Failed to download image', {
           src,
           error: error.message
@@ -108,7 +108,7 @@ class ImageHandler {
     try {
       imageUrl = new URL(src, baseUrl).href;
     } catch (error) {
-      throw new Error(`Invalid URL: ${src}`);
+      throw new Error(`Invalid URL: ${src}: ${error.message}`);
     }
 
     // Fetch image with timeout
@@ -200,7 +200,7 @@ class ImageHandler {
         })
         .jpeg({
           quality: this.imageQuality,
-          progressive: true
+          progressive: false
         })
         .toBuffer();
     } catch (error) {

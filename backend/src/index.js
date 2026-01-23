@@ -18,6 +18,11 @@ const __dirname = path.dirname(__filename);
 import articlesRouter from './routes/articles.js';
 import epubRouter from './routes/epub.js';
 import tagsRouter from './routes/tags.js';
+import settingsRouter from './routes/settings.js';
+
+// Import services
+import kindleService from './services/kindleService.js';
+import settingsService from './services/settingsService.js';
 
 const app = express();
 const PORT = getConfig('PORT', 3000);
@@ -73,6 +78,7 @@ app.use('/images', express.static(imagesDir));
 app.use('/api/articles', validateApiKey, apiLimiter, articlesRouter);
 app.use('/api/epub', validateApiKey, apiLimiter, epubRouter);
 app.use('/api/tags', validateApiKey, apiLimiter, tagsRouter);
+app.use('/api/settings', validateApiKey, apiLimiter, settingsRouter);
 
 // API status endpoint (with auth)
 app.get('/api/status', validateApiKey, (req, res) => {
@@ -97,6 +103,23 @@ try {
 } catch (error) {
   logger.error('Failed to initialize database', { error: error.message });
   process.exit(1);
+}
+
+// Try to load Kindle configuration from database if not configured from environment
+if (!kindleService.isConfigured()) {
+  try {
+    const smtpSettings = settingsService.getSmtpSettings();
+    if (settingsService.isSmtpConfigured()) {
+      kindleService.configure(smtpSettings);
+      logger.info('Kindle service configured from database settings');
+    } else {
+      logger.info('Kindle service not configured - waiting for SMTP settings via API');
+    }
+  } catch (error) {
+    logger.warn('Failed to load Kindle configuration from database', {
+      error: error.message
+    });
+  }
 }
 
 // Start server
