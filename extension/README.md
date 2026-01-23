@@ -49,7 +49,7 @@ Manifest V3 browser extension for capturing web articles and saving them to your
 
 ### Backend Server
 
-The extension connects to `http://localhost:3000` by default. To change this:
+The extension connects to `http://localhost:3001` by default. To change this:
 
 1. Edit `extension/manifest.json`
 2. Update the `host_permissions` array
@@ -145,7 +145,7 @@ The extension requires the following permissions:
 2. Background script injects content script
 3. Content script captures `document.documentElement.outerHTML`
 4. Data sent to background script
-5. Background sends POST to `http://localhost:3000/api/articles`
+5. Background sends POST to `http://localhost:3001/api/articles`
 6. Backend processes with Readability
 7. Article saved to SQLite database
 8. User receives notification

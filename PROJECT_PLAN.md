@@ -65,7 +65,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
   "version": "1.0.0",
   "description": "Save web articles for later reading",
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["http://localhost:3000/*"],
+  "host_permissions": ["http://localhost:3001/*"],
   "background": {
     "service_worker": "background.js"
   },
@@ -146,7 +146,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 #### Background Script (background.js)
 ```javascript
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'http://localhost:3001/api';
 
 chrome.action.onClicked.addListener((tab) => {
   chrome.tabs.sendMessage(tab.id, { action: 'CAPTURE_NOW' }, (response) => {
@@ -839,7 +839,7 @@ frontend/
 #### .env File
 ```env
 # Server
-PORT=3000
+PORT=3001
 NODE_ENV=development
 
 # Database

@@ -249,28 +249,28 @@ Stored in: `backend/config.json`
 
 ```bash
 # Health check (no auth required)
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 
 # API status (with auth)
 API_KEY="2d58bb929bde902b3b87e83bcfe7e0f2f3cc557cf79dab1bc3b6bfef9a5c60e7"
-curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/status
+curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 
 # Create article
 curl -X POST \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"html":"<article><h1>Test Article</h1><p>This is test content.</p></article>","url":"https://example.com/test"}' \
-  http://localhost:3000/api/articles
+  http://localhost:3001/api/articles
 
 # List articles
-curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/articles
+curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/articles
 
 # Generate EPUB (after creating articles)
 curl -X POST \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"articleIds":[1],"title":"My First Digest"}' \
-  http://localhost:3000/api/epub/generate
+  http://localhost:3001/api/epub/generate
 ```
 
 ## Next Steps

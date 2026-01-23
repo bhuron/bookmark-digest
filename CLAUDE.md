@@ -131,7 +131,7 @@ Key environment variables (see `backend/.env.example`):
 
 ```bash
 # Server
-PORT=3000
+PORT=3001
 NODE_ENV=development
 LOG_LEVEL=info
 
@@ -183,7 +183,7 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 
 The browser extension (not yet implemented) should:
 1. Use Manifest V3 with `activeTab`, `scripting`, `storage` permissions
-2. Send POST requests to `http://localhost:3000/api/articles` with:
+2. Send POST requests to `http://localhost:3001/api/articles` with:
    - Header: `X-API-Key: <key from config.json>`
    - Body: `{ html: document.documentElement.outerHTML, url: window.location.href, tags: [] }`
 3. Handle success/error responses

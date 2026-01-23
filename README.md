@@ -35,17 +35,17 @@ npm start
 The server will:
 1. Generate an API key on first run (saved to `config.json`)
 2. Initialize the SQLite database
-3. Start on `http://localhost:3000`
+3. Start on `http://localhost:3001`
 
 ### Test the Server
 
 ```bash
 # Health check (no auth required)
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 
 # API status (requires API key)
 API_KEY="your-api-key-here"
-curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/status
+curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 ```
 
 ## API Key Authentication
@@ -53,7 +53,7 @@ curl -H "X-API-Key: $API_KEY" http://localhost:3000/api/status
 All `/api/*` endpoints require an API key sent via the `X-API-Key` header:
 
 ```bash
-curl -H "X-API-Key: YOUR_API_KEY" http://localhost:3000/api/articles
+curl -H "X-API-Key: YOUR_API_KEY" http://localhost:3001/api/articles
 ```
 
 The API key is automatically generated on first run and saved to `backend/config.json`.
@@ -152,7 +152,7 @@ SQLite database with the following tables:
 Environment variables (see `backend/.env.example`):
 
 ```env
-PORT=3000
+PORT=3001
 NODE_ENV=development
 
 # Database
@@ -185,11 +185,11 @@ SMTP_PASSWORD=your_app_password
 
 ### Port Already in Use
 ```bash
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
+# Kill process on port 3001
+lsof -ti:3001 | xargs kill -9
 
 # Or use a different port
-PORT=3001 npm start
+PORT=3002 npm start
 ```
 
 ### Database Issues

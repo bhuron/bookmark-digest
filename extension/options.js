@@ -1,6 +1,6 @@
 // Options page JavaScript for Bookmark Digest extension
 
-const API_BASE = 'http://localhost:3000';
+const API_BASE = 'http://localhost:3001';
 const STORAGE_KEY_API = 'bookmarkDigestApiKey';
 
 // DOM elements
@@ -185,7 +185,7 @@ async function handleTest() {
 
     let errorMessage = error.message;
     if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
-      errorMessage = 'Cannot connect to server. Make sure the backend is running on port 3000.';
+      errorMessage = 'Cannot connect to server. Make sure the backend is running on port 3001.';
     }
 
     showStatus(`Connection failed: ${errorMessage}`, 'error');
