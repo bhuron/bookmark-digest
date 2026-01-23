@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment and config
+.env
+config.json
+
+# Database and data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/tasks.json

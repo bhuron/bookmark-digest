@@ -1,0 +1,42 @@
+{
+  "name": "bookmark-digest-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Bookmark Digest - Local Instapaper-like service",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "migrate": "node src/database/migrate.js",
+    "test": "jest",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "bookmark",
+    "readability",
+    "epub",
+    "kindle"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@mozilla/readability": "^0.4.0",
+    "@storyteller-platform/epub": "^0.2.0",
+    "better-sqlite3": "^11.0.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dompurify": "^3.0.0",
+    "express": "^4.18.0",
+    "express-rate-limit": "^7.0.0",
+    "express-validator": "^7.0.0",
+    "helmet": "^7.0.0",
+    "jsdom": "^22.0.0",
+    "nodemailer": "^6.9.0",
+    "sharp": "^0.33.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "nodemon": "^3.0.0"
+  }
+}
