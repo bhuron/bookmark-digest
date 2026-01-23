@@ -125,7 +125,40 @@
 - ✅ DELETE /api/tags/:id - Delete tag
 - ✅ GET /api/tags/:id/articles - Get articles with tag
 
-## ⏳ Phase 7: Frontend UI - NOT STARTED
+## ✅ Phase 7: Browser Extension - COMPLETE
+
+### Extension Files
+- ✅ Manifest V3 configuration
+- ✅ Background service worker
+- ✅ Content script for DOM capture
+- ✅ Options page (HTML/CSS/JS)
+- ✅ Extension icons (SVG + PNG)
+- ✅ Extension documentation
+
+### Features Implemented
+- ✅ One-click article capture via extension icon
+- ✅ Programmatic script injection for DOM capture
+- ✅ API key configuration and storage
+- ✅ Connection testing with backend
+- ✅ Enhanced user feedback (badges, notifications, progress)
+- ✅ Stage-by-stage progress indicators (capturing → processing → saved)
+- ✅ Smart error messages with helpful hints
+- ✅ Success notifications with article stats (word count, reading time)
+- ✅ First-run setup flow (auto-opens options)
+- ✅ Comprehensive error handling
+
+### Bug Fixes
+- ✅ Fixed Date object serialization for SQLite
+- ✅ Fixed port conflict (changed from 3000 to 3001)
+- ✅ Improved null handling in database operations
+
+### Configuration
+- ✅ API key authentication
+- ✅ Backend URL configuration (http://localhost:3001)
+- ✅ chrome.storage for persistent settings
+- ✅ Host permissions for API communication
+
+## ⏳ Phase 8: Frontend UI - NOT STARTED
 
 ### Components (To Create)
 - ⏳ Layout (Header, Sidebar, Layout)
@@ -146,7 +179,7 @@
 - ⏳ useTags
 - ⏳ useEPUB
 
-## ⏳ Phase 8: Testing - NOT STARTED
+## ⏳ Phase 9: Testing - NOT STARTED
 
 ### Unit Tests
 - ⏳ ArticleProcessor tests
@@ -161,7 +194,7 @@
 ## Current Issues
 
 ### Known Bugs
-1. **EPUB route Kindle send** - Missing `db` import in epub.js line 129
+- ✅ None (all bugs fixed)
 
 ### NPM Warnings (Cosmetic)
 - whatwg-encoding@2.0.6 - deprecated (from jsdom)

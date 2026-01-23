@@ -165,12 +165,21 @@
 - ✅ Smart content selector utilities (article, main, .article-content, etc.)
 - ✅ API key configuration in options page
 - ✅ Connection testing with health check
-- ✅ Error notifications (success/failure)
-- ✅ Progress indicators (loading states)
+- ✅ Enhanced error notifications with helpful hints
+- ✅ Stage-by-stage progress indicators (capturing → processing → saved)
+- ✅ Badge indicators on extension icon (⏳ loading, ✓ success, ✗ error)
+- ✅ Success notifications with word count and reading time
+- ✅ Smart error messages with context-specific hints
 - ✅ chrome.storage for API key persistence
 - ✅ Responsive options page UI
 - ✅ First-run setup flow (auto-opens options)
 - ✅ Comprehensive error handling
+
+**Bug Fixes:**
+- ✅ Fixed Date object serialization for SQLite (convert to ISO string)
+- ✅ Fixed boolean to integer conversion for database
+- ✅ Improved null handling for optional fields (author, siteName)
+- ✅ Port changed from 3000 to 3001 to avoid conflicts
 
 ### ⏳ Phase 8: Frontend UI (NOT STARTED)
 
