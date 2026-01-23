@@ -41,10 +41,15 @@ router.post('/',
 
     res.status(201).json({
       success: true,
-      articleId,
       article: {
         id: articleId,
-        ...processed
+        url: processed.url,
+        title: processed.title,
+        excerpt: processed.excerpt,
+        wordCount: processed.wordCount,
+        readingTimeMinutes: processed.readingTimeMinutes,
+        hasImages: processed.hasImages,
+        imageCount: processed.imageCount
       }
     });
   })

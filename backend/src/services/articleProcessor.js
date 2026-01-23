@@ -158,13 +158,13 @@ class ArticleProcessor {
           articleData.contentHtml,
           articleData.contentText,
           articleData.excerpt,
-          articleData.author,
-          articleData.siteName,
-          articleData.publishedAt,
+          articleData.author || null,
+          articleData.siteName || null,
+          articleData.publishedAt ? articleData.publishedAt.toISOString() : null,
           articleData.wordCount,
           articleData.readingTimeMinutes,
           articleData.language,
-          articleData.hasImages,
+          articleData.hasImages ? 1 : 0,
           articleData.imageCount
         );
 
