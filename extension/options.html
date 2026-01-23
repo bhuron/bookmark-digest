@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookmark Digest - Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-content">
+        <img src="icons/icon48.png" alt="Bookmark Digest" class="logo">
+        <h1>Bookmark Digest</h1>
+      </div>
+      <p class="subtitle">Configure your extension settings</p>
+    </header>
+
+    <main class="main">
+      <section class="card">
+        <h2>API Configuration</h2>
+        <p class="help-text">
+          Enter the API key from your Bookmark Digest backend server.
+          The key is stored in <code>backend/config.json</code>.
+        </p>
+
+        <form id="settings-form" class="form">
+          <div class="form-group">
+            <label for="api-key">API Key</label>
+            <input
+              type="text"
+              id="api-key"
+              class="input"
+              placeholder="Enter your API key..."
+              autocomplete="off"
+              spellcheck="false"
+              required
+            >
+            <p class="hint">
+              Find your API key in <code>backend/config.json</code> after starting the server
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="api-url">Server URL</label>
+            <input
+              type="text"
+              id="api-url"
+              class="input"
+              value="http://localhost:3000"
+              readonly
+            >
+            <p class="hint">
+              The extension connects to your local backend server
+            </p>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="button button-primary" id="save-btn">
+              <span class="button-text">Save Settings</span>
+              <span class="button-loader"></span>
+            </button>
+            <button type="button" class="button button-secondary" id="test-btn">
+              Test Connection
+            </button>
+          </div>
+        </form>
+
+        <div id="status-message" class="status-message" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>How to Use</h2>
+        <ol class="steps">
+          <li>Make sure the backend server is running: <code>cd backend && npm run dev</code></li>
+          <li>Copy the API key from <code>backend/config.json</code></li>
+          <li>Paste the API key above and click "Save Settings"</li>
+          <li>Click "Test Connection" to verify</li>
+          <li>Navigate to any article and click the extension icon to save</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>First Time Setup</h2>
+        <div class="code-block">
+          <p><strong># In the backend directory:</strong></p>
+          <pre><code>npm install
+cp .env.example .env
+npm run dev</code></pre>
+          <p class="help-text">
+            The server will start on <code>http://localhost:3000</code>
+            and generate an API key in <code>config.json</code>
+          </p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Troubleshooting</h2>
+        <dl class="faq">
+          <dt>Article not saving?</dt>
+          <dd>Check that the backend server is running and the API key is correct.</dd>
+
+          <dt>Connection test failing?</dt>
+          <dd>Verify the server is accessible at <code>http://localhost:3000/health</code></dd>
+
+          <dt>Paywalled content?</dt>
+          <dd>
+            Open the article in your browser first and log in if needed,
+            then click the extension to capture the rendered page.
+          </dd>
+
+          <dt>Where are saved articles?</dt>
+          <dd>
+            Articles are stored in the SQLite database at <code>backend/data/bookmark-digest.db</code>.
+            A web UI will be available in Phase 8 for browsing and managing articles.
+          </dd>
+        </dl>
+      </section>
+
+      <section class="card info">
+        <h2>Extension Info</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Version</span>
+            <span class="info-value" id="version">1.0.0</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Manifest</span>
+            <span class="info-value">V3</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Permissions</span>
+            <span class="info-value">activeTab, scripting, storage, notifications</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Bookmark Digest v<span id="footer-version">1.0.0</span></p>
+      <p>A local, self-hosted bookmarking service</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
