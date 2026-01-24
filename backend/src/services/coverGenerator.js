@@ -65,7 +65,9 @@ class CoverGenerator {
             input: Buffer.from(svg),
             top: 0,
             left: 0,
-          }
+  }
+
+
         ]);
 
       await coverImage.toFile(coverPath);
@@ -148,7 +150,7 @@ class CoverGenerator {
                   fill="#f1f5f9"
                   font-weight="700"
                   letter-spacing="-0.5">
-              ${this._escapeXml(this._wordWrap(displayTitle, 25).join('</tspan><tspan x="0" dy="70">'))}
+              ${this._generateTitleSvg(displayTitle)}
             </text>
 
             <!-- Decorative line below title -->
@@ -235,6 +237,24 @@ class CoverGenerator {
 
     // Limit to 3 lines max
     return lines.slice(0, 3);
+  }
+  _generateTitleSvg(title) {
+    const lines = this._wordWrap(title, 25);
+    if (lines.length === 0) return '';
+    
+    const escapedLines = lines.map(line => this._escapeXml(line));
+    
+    if (escapedLines.length === 1) {
+      return `<tspan x="0">${escapedLines[0]}</tspan>`;
+    }
+    
+    // First line without dy, subsequent lines with dy="70"
+    const tspans = [];
+    tspans.push(`<tspan x="0">${escapedLines[0]}</tspan>`);
+    for (let i = 1; i < escapedLines.length; i++) {
+      tspans.push(`<tspan x="0" dy="70">${escapedLines[i]}</tspan>`);
+    }
+    return tspans.join('');
   }
 }
 
