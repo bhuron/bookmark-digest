@@ -1,12 +1,11 @@
 import sharp from 'sharp';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 
 import { getConfig } from '../config.js';
 import logger from '../utils/logger.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 
 /**
  * Cover Image Generator
