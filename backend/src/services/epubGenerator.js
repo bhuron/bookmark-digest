@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
 import { getConfig } from '../config.js';
 import { getConnection } from '../database/index.js';
+import coverGenerator from './coverGenerator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,6 +64,22 @@ class EPUBGenerator {
        const filename = `${safeTitle}-${timestamp}.epub`;
        const filepath = path.join(this.outputDir, filename);
 
+       // Generate cover image automatically
+       let coverPath = null;
+       try {
+         coverPath = await coverGenerator.generateCover(
+           options.title || `Bookmark Digest - ${new Date().toLocaleDateString()}`,
+           articles.length,
+           options.author || 'Bookmark Digest',
+           options.cover // Use custom cover if provided, otherwise use default news-1.png
+         );
+         logger.info('Cover image generated successfully', { coverPath });
+       } catch (coverError) {
+         logger.warn('Failed to generate cover image, continuing without cover', {
+           error: coverError.message
+         });
+       }
+
        // Prepare CSS (extract from chapter template)
        const css = this._prepareCss();
        
@@ -97,8 +114,8 @@ class EPUBGenerator {
          content,
          // Disable audio/video downloads
          downloadAudioVideoFiles: false,
-         // Optional cover
-         cover: options.cover && await this._fileExists(options.cover) ? options.cover : null
+         // Use generated cover or custom cover
+         cover: coverPath || (options.cover && await this._fileExists(options.cover) ? options.cover : null)
        };
        
        // Create and render EPUB
