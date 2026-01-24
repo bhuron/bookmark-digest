@@ -1,0 +1,22 @@
+{
+  "name": "bookmark-digest",
+  "version": "1.0.0",
+  "description": "Bookmark Digest - Self-hosted bookmarking and reading service",
+  "private": true,
+  "scripts": {
+    "start": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop ecosystem.config.js",
+    "restart": "pm2 restart ecosystem.config.js",
+    "reload": "pm2 reload ecosystem.config.js",
+    "logs": "pm2 logs",
+    "logs:backend": "pm2 logs bookmark-digest-backend",
+    "logs:frontend": "pm2 logs bookmark-digest-frontend",
+    "monit": "pm2 monit",
+    "status": "pm2 status",
+    "flush": "pm2 flush",
+    "kill": "pm2 kill"
+  },
+  "devDependencies": {
+    "pm2": "^5.4.0"
+  }
+}
