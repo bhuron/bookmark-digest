@@ -111,21 +111,27 @@
 ### ✅ Phase 5: EPUB Generation Service (COMPLETE)
 
 **Files Created:**
-- `backend/src/services/epubGenerator.js` - EPUB generation with @storyteller-platform/epub
+- `backend/src/services/epubGenerator.js` - EPUB generation with @lesjoursfr/html-to-epub (replaced buggy @storyteller-platform/epub)
 
 **Key Features:**
-- ✅ EPUB 3 compliance using @storyteller-platform/epub (modern replacement for epub-gen)
+- ✅ EPUB 3.3 compliance using @lesjoursfr/html-to-epub (modern, validated library)
 - ✅ Chapter preparation with HTML/CSS styling
 - ✅ Table of contents generation
 - ✅ Metadata support (title, author, publisher)
 - ✅ Cover image support
 - ✅ Export history tracking in database
 - ✅ Batch article support (up to 100 articles)
-- ✅ Proper HTML escaping
+- ✅ Proper HTML escaping and XML entity conversion
 - ✅ Responsive styling for e-readers
 - ✅ Code block formatting
-- ✅ Image embedding support
+- ✅ **Image embedding support restored** (converts `/images/` paths to local file URLs)
 - ✅ File size tracking
+
+**Library Replacement (Jan 2026):**
+- **Old library:** `@storyteller-platform/epub` (buggy, Apple Books incompatible)
+- **New library:** `@lesjoursfr/html-to-epub` (EPUB 3.3 compliant, actively maintained)
+- **Validation:** Generated EPUBs pass epubcheck with 0 errors
+- **Image support:** Local images embedded via file:// URLs, progressive JPEG disabled for EPUB compatibility
 
 ### ✅ Phase 6: Kindle Email Service (COMPLETE)
 
@@ -213,6 +219,7 @@
 - ✅ Articles.jsx - Article list with search, filter, pagination
 - ✅ Tags.jsx - Tag management with create/edit/delete
 - ✅ Settings.jsx - API key configuration with stats display
+- ✅ EPUB.jsx - EPUB generation interface with article selection and export management
 
 **Key Features Implemented:**
 - ✅ React 18 with Vite for fast development

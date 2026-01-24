@@ -10,7 +10,7 @@ Bookmark Digest is a self-hosted bookmarking and reading service that captures w
 - Backend: Node.js + Express (ES modules)
 - Database: SQLite with better-sqlite3
 - Article Extraction: @mozilla/readability + jsdom + DOMPurify
-- EPUB Generation: @storyteller-platform/epub
+- EPUB Generation: @lesjoursfr/html-to-epub
 - Frontend: React + Vite
 - Extension: Manifest V3 (Chrome/Firefox)
 

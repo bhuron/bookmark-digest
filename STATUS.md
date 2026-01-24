@@ -72,21 +72,24 @@
 ## ✅ Phase 4: EPUB Generation Service - COMPLETE
 
 ### EPUB Generation
-- ✅ @storyteller-platform/epub integration
+- ✅ @lesjoursfr/html-to-epub integration (replaced buggy @storyteller-platform/epub)
 - ✅ Chapter preparation with HTML styling
 - ✅ Table of contents generation
 - ✅ Metadata support
 - ✅ Cover image support
 - ✅ Export history tracking
 - ✅ Batch article support (up to 100)
+- ✅ Image embedding restored (local file paths)
+- ✅ EPUB 3.3 compliance (passes epubcheck validation)
 
 ### EPUB Features
 - ✅ HTML formatting with CSS
 - ✅ Chapter numbering
 - ✅ Metadata display
-- ✅ Image embedding
+- ✅ Image embedding (local file paths)
 - ✅ Code block formatting
-- ✅ EPUB 3 compliance
+- ✅ EPUB 3.3 compliance (validated with epubcheck)
+- ✅ Progressive JPEG disabled for EPUB compatibility
 
 ## ✅ Phase 5: Kindle Integration - PARTIAL
 

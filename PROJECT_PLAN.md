@@ -15,13 +15,13 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 - **Backend**: Node.js + Express (ES modules)
 - **Database**: SQLite with better-sqlite3 (v11.0.0)
 - **Article Extraction**: @mozilla/readability + jsdom + DOMPurify
-- **EPUB Generation**: @storyteller-platform/epub (modern replacement for epub-gen)
+- **EPUB Generation**: @lesjoursfr/html-to-epub (EPUB 3.3 compliant, validated library)
 - **Email**: nodemailer for SMTP
 - **Frontend**: React + Vite + Tailwind CSS + TanStack Query
 - **Browser Extension**: Manifest V3 (Chrome/Firefox)
 - **Image Processing**: Sharp for optimization and format conversion
 
-### Current Status (January 2025)
+### Current Status (January 2026)
 **✅ FULLY IMPLEMENTED** - All core features are complete and working.
 
 **Recent Fixes & Improvements:**
@@ -30,6 +30,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 3. **Improved article typography** - Added Tailwind Typography plugin for better readability
 4. **Enhanced DOMPurify configuration** - Preserves HTML attributes for proper styling
 5. **Database path corrections** - Updated existing articles with correct image paths
+6. **EPUB library replacement** - Replaced buggy @storyteller-platform/epub with @lesjoursfr/html-to-epub (EPUB 3.3 compliant, image support restored)
 
 **Ready for Use:** The application is fully functional for local use with browser extension capture, web UI management, EPUB generation, and Kindle email delivery.
 
@@ -1099,7 +1100,7 @@ async function getArticlesWithCache(options) {
 - [x] Add tag management interface with color coding
 
 ### Phase 5: EPUB Generation ✅ COMPLETE
-- [x] Integrate @storyteller-platform/epub library (modern EPUB 3)
+- [x] Integrate @lesjoursfr/html-to-epub library (EPUB 3.3 compliant)
 - [x] Create EPUB formatting templates with responsive styling
 - [x] Implement batch article selection (up to 100 articles)
 - [x] Add export history tracking in database
