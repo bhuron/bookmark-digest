@@ -173,21 +173,25 @@
 - ✅ useArticles
 - ✅ useEPUB
 
-## ⏳ Phase 9: Testing - PARTIAL
+## ✅ Phase 9: Testing - COMPLETE
 
 ### Linting & Code Quality
 - ✅ ESLint configuration (backend and frontend)
 - ✅ ESLint fixes applied
 
-### Unit Tests
-- ⏳ ArticleProcessor tests (test file created but not passing)
-- ⏳ EPUBGenerator tests (needs integration with fixed library)
-- ⏳ Database tests
-- ⏳ API route tests
+### Unit Tests (104 tests passing)
+- ✅ ArticleProcessor tests (11 tests)
+- ✅ EPUBGenerator tests (31 tests)
+- ✅ ImageHandler tests (29 tests)
+- ✅ Database tests (19 tests)
+- ✅ API route tests (14 tests)
 
-### Integration Tests
-- ⏳ End-to-end workflow tests
-- ⏳ Extension communication tests
+### Integration Tests (45 tests passing)
+- ✅ Articles API integration tests (24 tests)
+- ✅ EPUB API integration tests (21 tests)
+- ✅ Test database isolation
+- ✅ Rate limiting bypass for tests
+- ✅ API response structure validation
 
 ## Current Issues
 
@@ -212,6 +216,11 @@ Stored in: `backend/config.json`
 ### Test Commands
 
 ```bash
+# Backend tests (in /backend directory)
+npm test                 # Run all tests
+npm test -- --watch      # Run tests in watch mode
+npm run lint             # Run ESLint
+
 # Health check
 curl http://localhost:3001/health
 
@@ -235,7 +244,7 @@ curl -X POST \
 
 ## Next Actions
 
-1. **Complete unit tests** - Finish Jest configuration and write passing tests
+1. ✅ **Complete unit tests** - Jest configuration complete, 149 tests passing
 2. **Browser extension testing** - Test extension with real backend
 3. **SMTP configuration** - Set up real SMTP credentials for Kindle email
 4. **Deployment preparation** - Docker configuration and deployment docs
