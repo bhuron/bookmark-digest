@@ -137,11 +137,6 @@ class CoverGenerator {
 
           <!-- Center section: Title -->
           <g transform="translate(${padding}, ${height * 0.45})">
-            <!-- Decorative line above title -->
-            <line x1="0" y1="-30" x2="80" y2="-30"
-                  stroke="#14b8a6"
-                  stroke-width="3"
-                  stroke-linecap="round"/>
 
             <!-- Main title -->
             <text x="0" y="0"
