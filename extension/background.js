@@ -14,8 +14,6 @@ async function getApiKey() {
   });
 }
 
-
-
 /**
  * Save API key to chrome.storage
  */
@@ -28,10 +26,12 @@ async function saveApiKey(apiKey) {
 }
 
 /**
- * Set badge on extension icon
+ * Set subtle badge on extension icon
+ * Uses colored dots instead of emoji for cleaner look
  */
-function setBadge(text, color = '#2563eb') {
-  chrome.action.setBadgeText({ text });
+function setBadge(color) {
+  // Use a single dot as badge, color indicates status
+  chrome.action.setBadgeText({ text: '•' });
   chrome.action.setBadgeBackgroundColor({ color });
   // Clear badge after 3 seconds
   setTimeout(() => {
@@ -40,16 +40,22 @@ function setBadge(text, color = '#2563eb') {
 }
 
 /**
- * Show notification to user
+ * Show toast notification in the active tab
  */
-function showNotification(title, message, type = 'basic') {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icons/icon48.png',
-    title,
-    message,
-    priority: type === 'error' ? 2 : 1
-  });
+async function showToast(tabId, options) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (toastOptions) => {
+        if (window.bdToast) {
+          window.bdToast.show(toastOptions);
+        }
+      },
+      args: [options]
+    });
+  } catch (error) {
+    console.error('Failed to show toast:', error);
+  }
 }
 
 /**
@@ -190,77 +196,73 @@ chrome.action.onClicked.addListener(async (tab) => {
     // Check if API key is configured
     const apiKey = await getApiKey();
     if (!apiKey) {
-      setBadge('!', '#ef4444');
-      showNotification(
-        '⚙️ Configuration Required',
-        'Click here to set your API key in options.',
-        'error'
-      );
+      setBadge('#ef4444');
+      await showToast(tab.id, {
+        title: 'Configuration Required',
+        message: 'Set your API key in extension options to get started.',
+        type: 'error'
+      });
       return;
     }
 
     // Stage 1: Capturing
-    setBadge('⏳', '#2563eb');
-    showNotification(
-      '⏳ Capturing Article...',
-      'Reading page content...'
-    );
+    setBadge('#ff4d2a');
+    await showToast(tab.id, {
+      title: 'Capturing Article',
+      message: 'Reading page content...',
+      type: 'capturing'
+    });
 
     const capturedData = await capturePage(tab);
 
     // Stage 2: Processing
-    setBadge('⏳', '#f59e0b');
-    showNotification(
-      '⏳ Processing Article...',
-      'Extracting content and saving to server...'
-    );
+    setBadge('#f59e0b');
+    await showToast(tab.id, {
+      title: 'Processing Article',
+      message: 'Extracting content and saving to server...',
+      type: 'processing'
+    });
 
     // Send to backend
     const result = await saveArticle(capturedData);
 
     // Stage 3: Success!
-    setBadge('✓', '#10b981');
-    showNotification(
-      '✅ Article Saved!',
-      `"${result.article.title}" (${result.article.wordCount?.toLocaleString() || 'N/A'} words, ${result.article.readingTimeMinutes || 0} min read)`,
-      'success'
-    );
-
-    // Optional: Play a subtle sound (browser must allow)
-    try {
-      // Only works if user has interacted with the page
-      new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2i98Of0TQAUUqnr8LplHAY4kNTyyyUoBStx0/DWk0AKFFm5u+5YBgJQp3g8b1vIAUrgs/0yIk2CBtosfDn9E0AFFKp6/C6ZxwGOJDU8s8lKAUrcdPw1pNAChRZubvuWAYCUKd4PG9ryAFK4LP9MiJNggbaLHw5/RNABRSqevwumccBjiQ1PPLJSlFeuj0vwAAAARwAAAAA=').play().catch(() => {});
-    } catch (e) {
-      // Ignore audio errors
-    }
+    setBadge('#10b981');
+    await showToast(tab.id, {
+      title: 'Article Saved',
+      message: result.article.title || 'Untitled',
+      type: 'success',
+      meta: {
+        wordCount: result.article.wordCount,
+        readingTime: result.article.readingTimeMinutes
+      }
+    });
 
   } catch (error) {
     console.error('Error saving article:', error);
 
     // Show error badge
-    setBadge('✗', '#ef4444');
+    setBadge('#ef4444');
 
     // Determine error type and provide helpful message
     let errorMessage = error.message || 'Failed to save article';
-    let errorHint = '';
+    let hintMessage = '';
 
     if (errorMessage.includes('API key not configured')) {
-      errorHint = '\n\n💡 Click the extension icon and select Options to configure.';
+      hintMessage = 'Set your API key in extension options.';
     } else if (errorMessage.includes('Invalid API key')) {
-      errorHint = '\n\n💡 Check your API key in extension options.';
-    } else if (errorMessage.includes('Server is not running')) {
-      errorHint = '\n\n💡 Start the backend server: cd backend && npm run dev';
-    } else if (errorMessage.includes('fetch')) {
-      errorHint = '\n\n💡 Make sure the backend server is running on port 3001.';
+      hintMessage = 'Check your API key in extension options.';
+    } else if (errorMessage.includes('Server is not running') || errorMessage.includes('fetch')) {
+      hintMessage = 'Make sure the backend server is running.';
     } else if (errorMessage.includes('Failed to capture')) {
-      errorHint = '\n\n💡 Try refreshing the page and clicking again.';
+      hintMessage = 'Try refreshing the page and clicking again.';
     }
 
-    showNotification(
-      '❌ Save Failed',
-      errorMessage + errorHint,
-      'error'
-    );
+    await showToast(tab.id, {
+      title: 'Save Failed',
+      message: hintMessage || errorMessage,
+      type: 'error'
+    });
   }
 });
 

@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Bookmark Digest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Save web articles for later reading and EPUB conversion",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage",
-    "notifications"
+    "storage"
   ],
   "host_permissions": [
     "http://localhost:3001/*"
