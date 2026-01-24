@@ -3,9 +3,29 @@ import { getConfig } from '../config.js';
 import logger from '../utils/logger.js';
 
 /**
+ * Check if we're in test mode
+ */
+function isTestMode() {
+  return process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true';
+}
+
+/**
+ * Create a rate limiter that checks test mode at runtime
+ */
+function createRateLimiter(options) {
+  const limiter = rateLimit(options);
+  return (req, res, next) => {
+    if (isTestMode()) {
+      return next();
+    }
+    return limiter(req, res, next);
+  };
+}
+
+/**
  * Rate limiter for API endpoints
  */
-export const apiLimiter = rateLimit({
+export const apiLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: getConfig('API_RATE_LIMIT', 100), // Limit each IP to 100 requests per windowMs
   message: {
@@ -29,7 +49,7 @@ export const apiLimiter = rateLimit({
 /**
  * Stricter rate limiter for expensive operations (EPUB generation)
  */
-export const heavyOperationLimiter = rateLimit({
+export const heavyOperationLimiter = createRateLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // 10 EPUB generations per hour
   message: {
@@ -53,7 +73,7 @@ export const heavyOperationLimiter = rateLimit({
 /**
  * Rate limiter for article creation
  */
-export const articleCreationLimiter = rateLimit({
+export const articleCreationLimiter = createRateLimiter({
   windowMs: 60 * 1000, // 1 minute
   max: 20, // 20 articles per minute
   message: {
@@ -73,5 +93,8 @@ export const articleCreationLimiter = rateLimit({
     });
   }
 });
+
+// Export the createRateLimiter function for testing
+export { createRateLimiter };
 
 export default { apiLimiter, heavyOperationLimiter, articleCreationLimiter };

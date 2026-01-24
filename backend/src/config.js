@@ -69,6 +69,13 @@ export function getConfig(key, defaultValue = null) {
   return process.env[key] || defaultValue;
 }
 
+/**
+ * Generate a new API key (for testing)
+ */
+export function generateApiKey() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 // Load environment and config on import
 loadEnv();
 const config = ensureConfig();
