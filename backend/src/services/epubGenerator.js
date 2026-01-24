@@ -178,22 +178,35 @@ class EPUBGenerator {
    */
   _prepareCss() {
     return `body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Georgia, serif;
-  line-height: 1.6;
-  max-width: 800px;
+  font-family: Georgia, 'Times New Roman', Times, serif;
+  line-height: 1.65;
+  max-width: 700px;
   margin: 0 auto;
   padding: 20px;
   color: #333;
+  text-align: justify;
+  hyphens: auto;
 }
 h1 {
-  border-bottom: 2px solid #eee;
-  padding-bottom: 10px;
-  margin-bottom: 20px;
-  font-size: 1.8em;
+  font-size: 2em;
+  margin-top: 1.5em;
+  margin-bottom: 1em;
+  font-weight: bold;
+  line-height: 1.3;
+  page-break-after: avoid;
 }
 h2, h3, h4, h5, h6 {
   margin-top: 1.5em;
   margin-bottom: 0.8em;
+  page-break-after: avoid;
+}
+h2 {
+  font-size: 1.6em;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5em;
+}
+h3 {
+  font-size: 1.3em;
 }
 p {
   margin-bottom: 1em;
@@ -203,23 +216,78 @@ img {
   height: auto;
   display: block;
   margin: 1.5em auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  page-break-inside: avoid;
+}
+figure {
+  margin: 2em 0;
+  text-align: center;
+  page-break-inside: avoid;
+}
+figcaption {
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 0.5em;
+  font-style: italic;
+  line-height: 1.4;
 }
 pre {
-  background: #f4f4f4;
+  background: #f8f9fa;
   padding: 1em;
   overflow-x: auto;
-  border-radius: 4px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  font-family: 'Courier New', Courier, monospace;
+  line-height: 1.5;
+  page-break-inside: avoid;
 }
 code {
-  background: #f4f4f4;
+  background: #f8f9fa;
   padding: 0.2em 0.4em;
   border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  border: 1px solid #e9ecef;
 }
 blockquote {
-  border-left: 4px solid #ddd;
-  padding-left: 1em;
+  border-left: 4px solid #6c757d;
+  padding-left: 1.5em;
+  margin: 2em 0;
+  color: #495057;
+  font-style: italic;
+  background: #f8f9fa;
+  padding-top: 1em;
+  padding-bottom: 1em;
+  padding-right: 1em;
+  border-radius: 0 6px 6px 0;
+  page-break-inside: avoid;
+}
+ul, ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+li {
+  margin-bottom: 0.5em;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
   margin: 1.5em 0;
-  color: #666;
+}
+th, td {
+  border: 1px solid #dee2e6;
+  padding: 0.75em;
+  text-align: left;
+}
+th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 2em 0;
 }
 a {
   color: #0066cc;
@@ -234,6 +302,7 @@ a:hover {
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 1px solid #eee;
+  page-break-after: avoid;
 }
 .original-url {
   word-break: break-all;
