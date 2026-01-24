@@ -134,7 +134,7 @@ class ArticleProcessor {
   /**
    * Save processed article to database
    */
-  async saveArticle(articleData, tags = []) {
+  async saveArticle(articleData) {
     const db = getConnection();
 
     try {
@@ -188,10 +188,7 @@ class ArticleProcessor {
           this._saveImages(db, articleId, articleData.images);
         }
 
-        // Process tags
-        if (tags && tags.length > 0) {
-          this._saveTagsForArticle(db, articleId, tags);
-        }
+
 
         logger.info('Article saved successfully', {
           articleId,
@@ -241,42 +238,7 @@ class ArticleProcessor {
     }
   }
 
-  /**
-   * Save tags for an article
-   */
-  _saveTagsForArticle(db, articleId, tagNames) {
-    const tagInsertStmt = db.prepare(`
-      INSERT OR IGNORE INTO tags (name) VALUES (?)
-    `);
 
-    const tagGetStmt = db.prepare(`
-      SELECT id FROM tags WHERE name = ?
-    `);
-
-    const articleTagStmt = db.prepare(`
-      INSERT OR IGNORE INTO article_tags (article_id, tag_id) VALUES (?, ?)
-    `);
-
-    for (const tagName of tagNames) {
-      try {
-        const cleanTag = tagName.trim().toLowerCase();
-        if (!cleanTag) continue;
-
-        tagInsertStmt.run(cleanTag);
-        const tagResult = tagGetStmt.get(cleanTag);
-
-        if (tagResult) {
-          articleTagStmt.run(articleId, tagResult.id);
-        }
-      } catch (error) {
-        logger.error('Failed to save tag', {
-          articleId,
-          tagName,
-          error: error.message
-        });
-      }
-    }
-  }
 
   /**
    * Mark article as failed

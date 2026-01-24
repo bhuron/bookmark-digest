@@ -26,23 +26,9 @@ CREATE TABLE IF NOT EXISTS articles (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tags table
-CREATE TABLE IF NOT EXISTS tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  color TEXT DEFAULT '#6B7280',
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
--- Article-tag junction table
-CREATE TABLE IF NOT EXISTS article_tags (
-  article_id INTEGER NOT NULL,
-  tag_id INTEGER NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (article_id, tag_id),
-  FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
-  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
-);
+
+
 
 -- Images table (for local image storage)
 CREATE TABLE IF NOT EXISTS article_images (
@@ -92,9 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_articles_is_favorite ON articles(is_favorite);
 CREATE INDEX IF NOT EXISTS idx_articles_site_name ON articles(site_name);
 CREATE INDEX IF NOT EXISTS idx_articles_language ON articles(language);
 CREATE INDEX IF NOT EXISTS idx_articles_capture_success ON articles(capture_success);
-CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
-CREATE INDEX IF NOT EXISTS idx_article_tags_article_id ON article_tags(article_id);
-CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
+
 CREATE INDEX IF NOT EXISTS idx_article_images_article_id ON article_images(article_id);
 
 -- Triggers for updated_at

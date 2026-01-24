@@ -158,7 +158,7 @@ No build system currently; load unpacked extension in browser developer mode.
 
 - **Database**: SQLite with WAL mode for better concurrency.
 - **Dates**: Stored as ISO strings in SQLite, converted to `Date` objects in JavaScript.
-- **Tags**: Normalized to lowercase and trimmed.
+
 - **Images**: Stored locally under `./data/images/{articleId}/`. If download fails, article is still saved (images skipped).
 - **Reading Time**: Based on 200 words per minute average.
 - **Security**: All API endpoints (except `/health`) require an API key sent via `X‑API‑Key` header.

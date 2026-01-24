@@ -54,23 +54,7 @@ export default function ArticleCard({ article }) {
               <p className="text-sm text-gray-500">{article.site_name}</p>
             )}
 
-            {/* Tags */}
-            {article.tags && article.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {article.tags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium"
-                    style={{
-                      backgroundColor: tag.color + '20',
-                      color: tag.color,
-                    }}
-                  >
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            )}
+
           </div>
 
           <div className="flex items-center gap-2">

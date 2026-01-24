@@ -1,4 +1,4 @@
-import { useState } from 'react';
+
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,8 +10,7 @@ import {
   Calendar,
   Clock,
   FileText,
-  Tag,
-  X,
+
 } from 'lucide-react';
 import { articlesApi } from '../../services/api';
 import LoadingSpinner from '../Common/LoadingSpinner';
@@ -21,8 +20,7 @@ export default function ArticleViewer() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showTagInput, setShowTagInput] = useState(false);
-  const [newTag, setNewTag] = useState('');
+
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -35,6 +33,7 @@ export default function ArticleViewer() {
       queryClient.invalidateQueries({ queryKey: ['article', id] });
       queryClient.invalidateQueries({ queryKey: ['articles'] });
     },
+    onError: (error) => console.error('Failed to update article:', error),
   });
 
   const deleteMutation = useMutation({
@@ -43,23 +42,10 @@ export default function ArticleViewer() {
       queryClient.invalidateQueries({ queryKey: ['articles'] });
       navigate('/');
     },
+    onError: (error) => console.error('Failed to delete article:', error),
   });
 
-  const addTagMutation = useMutation({
-    mutationFn: (tags) => articlesApi.addTags(id, tags),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['article', id] });
-      setNewTag('');
-      setShowTagInput(false);
-    },
-  });
 
-  const removeTagMutation = useMutation({
-    mutationFn: (tagId) => articlesApi.removeTag(id, tagId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['article', id] });
-    },
-  });
 
   const handleToggleFavorite = () => {
     updateMutation.mutate({ is_favorite: !article?.is_favorite });
@@ -75,12 +61,7 @@ export default function ArticleViewer() {
     }
   };
 
-  const handleAddTag = (e) => {
-    e.preventDefault();
-    if (newTag.trim()) {
-      addTagMutation.mutate({ tags: [newTag.trim()] });
-    }
-  };
+
 
   if (isLoading) {
     return (
@@ -180,62 +161,7 @@ export default function ArticleViewer() {
           {article.site_name && <span>{article.site_name}</span>}
         </div>
 
-        {/* Tags */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <Tag className="w-4 h-4 text-gray-400" />
-          <div className="flex flex-wrap gap-2">
-            {article.tags?.map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium group"
-                style={{
-                  backgroundColor: tag.color + '20',
-                  color: tag.color,
-                }}
-              >
-                {tag.name}
-                <button
-                  onClick={() => removeTagMutation.mutate(tag.id)}
-                  className="opacity-0 group-hover:opacity-100 hover:opacity-80 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-          <button
-            onClick={() => setShowTagInput(!showTagInput)}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            + Add tag
-          </button>
-        </div>
 
-        {showTagInput && (
-          <form onSubmit={handleAddTag} className="mt-2 flex items-center gap-2">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Tag name..."
-              className="input flex-1"
-              autoFocus
-            />
-            <button type="submit" className="btn btn-primary">
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowTagInput(false);
-                setNewTag('');
-              }}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          </form>
-        )}
       </div>
 
       {/* Content */}

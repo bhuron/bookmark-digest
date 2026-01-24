@@ -48,7 +48,7 @@
 
 ### Database Operations
 - ✅ Article CRUD with upsert
-- ✅ Tag management
+
 - ✅ Image metadata storage
 - ✅ Transaction support
 - ✅ Failed attempt logging
@@ -109,8 +109,7 @@
 - ✅ GET /api/articles/:id - Get single article
 - ✅ PUT /api/articles/:id - Update article
 - ✅ DELETE /api/articles/:id - Delete article
-- ✅ POST /api/articles/:id/tags - Add tags
-- ✅ DELETE /api/articles/:id/tags/:tagId - Remove tag
+
 - ✅ GET /api/articles/stats - Statistics
 
 ### EPUB API
@@ -121,12 +120,7 @@
 - ✅ DELETE /api/epub/exports/:id - Delete export
 - ⏳ POST /api/epub/exports/:id/send-to-kindle - Send to Kindle (has bug)
 
-### Tags API
-- ✅ GET /api/tags - List all tags
-- ✅ POST /api/tags - Create tag
-- ✅ PUT /api/tags/:id - Update tag
-- ✅ DELETE /api/tags/:id - Delete tag
-- ✅ GET /api/tags/:id/articles - Get articles with tag
+
 
 ## ✅ Phase 7: Browser Extension - COMPLETE
 
@@ -166,20 +160,17 @@
 ### Components
 - ✅ Layout (Header, Sidebar, Layout)
 - ✅ Articles (List, Card, Viewer, Filters)
-- ✅ Tags (Manager, Filter)
 - ✅ EPUB (Generator, Export History, Kindle Settings)
 - ✅ Common (SearchBar, Pagination, LoadingSpinner)
 
 ### Pages
 - ✅ Home
 - ✅ Articles
-- ✅ Tags
 - ✅ Settings
 - ✅ EPUB
 
 ### Hooks
 - ✅ useArticles
-- ✅ useTags
 - ✅ useEPUB
 
 ## ⏳ Phase 9: Testing - PARTIAL

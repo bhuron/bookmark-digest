@@ -40,7 +40,6 @@ localStorage.setItem('bookmark_digest_api_key', 'your-api-key-here')
 
 - **Articles**: Browse, search, and filter saved articles
 - **Article Viewer**: Read articles with formatting preserved
-- **Tags**: Create and manage tags to organize articles
 - **Settings**: Configure API key and view statistics
 
 ## Tech Stack

@@ -17,7 +17,7 @@ const __dirname = path.dirname(__filename);
 // Import routes
 import articlesRouter from './routes/articles.js';
 import epubRouter from './routes/epub.js';
-import tagsRouter from './routes/tags.js';
+
 import settingsRouter from './routes/settings.js';
 
 // Import services
@@ -77,7 +77,7 @@ app.use('/images', express.static(imagesDir));
 // API routes with authentication
 app.use('/api/articles', validateApiKey, apiLimiter, articlesRouter);
 app.use('/api/epub', validateApiKey, apiLimiter, epubRouter);
-app.use('/api/tags', validateApiKey, apiLimiter, tagsRouter);
+
 app.use('/api/settings', validateApiKey, apiLimiter, settingsRouter);
 
 // API status endpoint (with auth)

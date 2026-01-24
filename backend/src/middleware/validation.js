@@ -42,16 +42,7 @@ export const validationRules = {
       .isString()
       .isLength({ max: 500 })
       .withMessage('Title too long'),
-    body('tags')
-      .optional()
-      .isArray()
-      .withMessage('Tags must be an array'),
-    body('tags.*')
-      .optional()
-      .isString()
-      .trim()
-      .isLength({ min: 1, max: 50 })
-      .withMessage('Each tag must be 1-50 characters')
+
   ],
 
   // Article ID parameter
@@ -71,12 +62,7 @@ export const validationRules = {
       .optional()
       .isInt({ min: 1, max: 100 })
       .withMessage('Limit must be between 1 and 100'),
-    query('tag')
-      .optional()
-      .isString()
-      .trim()
-      .isLength({ min: 1, max: 50 })
-      .withMessage('Tag filter invalid'),
+
     query('search')
       .optional()
       .isString()

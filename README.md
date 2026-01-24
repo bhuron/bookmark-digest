@@ -118,8 +118,6 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 - `GET /api/articles/:id` - Get single article
 - `PUT /api/articles/:id` - Update article
 - `DELETE /api/articles/:id` - Delete article
-- `POST /api/articles/:id/tags` - Add tags to article
-- `DELETE /api/articles/:id/tags/:tagId` - Remove tag
 - `GET /api/articles/stats` - Get statistics
 
 ### EPUB
@@ -130,19 +128,12 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 - `DELETE /api/epub/exports/:id` - Delete export
 - `POST /api/epub/exports/:id/send-to-kindle` - Send to Kindle
 
-### Tags
-- `GET /api/tags` - List all tags
-- `POST /api/tags` - Create tag
-- `PUT /api/tags/:id` - Update tag
-- `DELETE /api/tags/:id` - Delete tag
-- `GET /api/tags/:id/articles` - Get articles with tag
+
 
 ## Database
 
 SQLite database with the following tables:
 - `articles` - Stored articles with metadata
-- `tags` - Tag definitions
-- `article_tags` - Article-tag relationships
 - `article_images` - Downloaded images
 - `epub_exports` - EPUB export history
 - `settings` - Application settings

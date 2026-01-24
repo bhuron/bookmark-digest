@@ -14,6 +14,8 @@ async function getApiKey() {
   });
 }
 
+
+
 /**
  * Save API key to chrome.storage
  */
@@ -152,6 +154,8 @@ async function saveArticle(data) {
     throw new Error('API key not configured. Please set it in extension options.');
   }
 
+
+
   const response = await fetch(`${API_BASE}/articles`, {
     method: 'POST',
     headers: {
@@ -160,8 +164,7 @@ async function saveArticle(data) {
     },
     body: JSON.stringify({
       html: data.html,
-      url: data.url,
-      tags: []
+      url: data.url
     })
   });
 

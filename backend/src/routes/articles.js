@@ -17,7 +17,7 @@ router.post('/',
   validationRules.createArticle,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { html, url, tags } = req.body;
+    const { html, url } = req.body;
 
     logger.info('Creating article', { url });
 
@@ -37,7 +37,7 @@ router.post('/',
     }
 
     // Save to database
-    const articleId = await articleProcessor.saveArticle(processed, tags || []);
+    const articleId = await articleProcessor.saveArticle(processed);
 
     res.status(201).json({
       success: true,
@@ -63,7 +63,7 @@ router.get('/',
   validationRules.listArticles,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, tag, search, is_archived, is_favorite, sort_by = 'created_at' } = req.query;
+    const { page = 1, limit = 20, search, is_archived, is_favorite, sort_by = 'created_at' } = req.query;
     const offset = (page - 1) * limit;
 
     const db = getConnection();
@@ -72,10 +72,7 @@ router.get('/',
     let whereConditions = ['a.capture_success = 1'];
     const params = [];
 
-    if (tag) {
-      whereConditions.push('t.name = ?');
-      params.push(tag);
-    }
+
 
     if (search) {
       whereConditions.push('(a.title LIKE ? OR a.content_text LIKE ? OR a.excerpt LIKE ?)');
@@ -118,47 +115,30 @@ router.get('/',
 
     // Fetch articles
     const articles = db.prepare(`
-      SELECT DISTINCT a.*
+      SELECT a.*
       FROM articles a
-      LEFT JOIN article_tags at ON a.id = at.article_id
-      LEFT JOIN tags t ON at.tag_id = t.id
       WHERE ${whereClause}
-      GROUP BY a.id
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
 
     // Get count
     const countResult = db.prepare(`
-      SELECT COUNT(DISTINCT a.id) as total
+      SELECT COUNT(*) as total
       FROM articles a
-      LEFT JOIN article_tags at ON a.id = at.article_id
-      LEFT JOIN tags t ON at.tag_id = t.id
       WHERE ${whereClause}
     `).get(...params);
 
-    // Get tags for each article
-    const articlesWithTags = articles.map(article => {
-      const tags = db.prepare(`
-        SELECT t.id, t.name, t.color
-        FROM tags t
-        INNER JOIN article_tags at ON t.id = at.tag_id
-        WHERE at.article_id = ?
-        ORDER BY t.name
-      `).all(article.id);
-
-      return {
-        ...article,
-        tags,
-        has_images: Boolean(article.has_images),
-        is_archived: Boolean(article.is_archived),
-        is_favorite: Boolean(article.is_favorite)
-      };
-    });
+    const articlesWithMetadata = articles.map(article => ({
+      ...article,
+      has_images: Boolean(article.has_images),
+      is_archived: Boolean(article.is_archived),
+      is_favorite: Boolean(article.is_favorite)
+    }));
 
     res.json({
       data: {
-        articles: articlesWithTags,
+        articles: articlesWithMetadata,
         total: countResult.total
       }
     });
@@ -186,14 +166,7 @@ router.get('/stats',
       WHERE capture_success = 1
     `).get();
 
-    const tagStats = db.prepare(`
-      SELECT t.name, COUNT(at.article_id) as article_count
-      FROM tags t
-      LEFT JOIN article_tags at ON t.id = at.tag_id
-      GROUP BY t.id
-      ORDER BY article_count DESC
-      LIMIT 20
-    `).all();
+
 
     res.json({
       total_articles: stats.total_articles || 0,
@@ -202,8 +175,7 @@ router.get('/stats',
       unread_articles: stats.unread_articles || 0,
       articles_with_images: stats.articles_with_images || 0,
       total_words: stats.total_words || 0,
-      total_reading_time: stats.total_reading_time || 0,
-      popular_tags: tagStats
+      total_reading_time: stats.total_reading_time || 0
     });
   })
 );
@@ -232,19 +204,9 @@ router.get('/:id',
       });
     }
 
-    // Get tags for this article
-    const tags = db.prepare(`
-      SELECT t.id, t.name, t.color
-      FROM tags t
-      INNER JOIN article_tags at ON t.id = at.tag_id
-      WHERE at.article_id = ?
-      ORDER BY t.name
-    `).all(id);
-
     res.json({
       article: {
         ...article,
-        tags,
         has_images: Boolean(article.has_images),
         is_archived: Boolean(article.is_archived),
         is_favorite: Boolean(article.is_favorite)
@@ -344,90 +306,8 @@ router.delete('/:id',
   })
 );
 
-/**
- * POST /api/articles/:id/tags
- * Add tags to article
- */
-router.post('/:id/tags',
-  validationRules.articleId,
-  validateRequest,
-  asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { tags } = req.body;
 
-    if (!Array.isArray(tags) || tags.length === 0) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Tags must be a non-empty array'
-      });
-    }
 
-    const db = getConnection();
 
-    // Check if article exists
-    const existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(id);
-    if (!existing) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Article not found'
-      });
-    }
-
-    // Add tags
-    const tagInsertStmt = db.prepare('INSERT OR IGNORE INTO tags (name) VALUES (?)');
-    const tagGetStmt = db.prepare('SELECT id FROM tags WHERE name = ?');
-    const articleTagStmt = db.prepare('INSERT OR IGNORE INTO article_tags (article_id, tag_id) VALUES (?, ?)');
-
-    for (const tagName of tags) {
-      const cleanTag = tagName.trim().toLowerCase();
-      if (!cleanTag) continue;
-
-      tagInsertStmt.run(cleanTag);
-      const tagResult = tagGetStmt.get(cleanTag);
-
-      if (tagResult) {
-        articleTagStmt.run(id, tagResult.id);
-      }
-    }
-
-    logger.info('Tags added to article', { articleId: id, tags });
-
-    res.json({
-      success: true,
-      message: 'Tags added successfully'
-    });
-  })
-);
-
-/**
- * DELETE /api/articles/:id/tags/:tagId
- * Remove tag from article
- */
-router.delete('/:id/tags/:tagId',
-  validateRequest,
-  asyncHandler(async (req, res) => {
-    const { id, tagId } = req.params;
-    const db = getConnection();
-
-    const result = db.prepare(`
-      DELETE FROM article_tags
-      WHERE article_id = ? AND tag_id = ?
-    `).run(id, tagId);
-
-    if (result.changes === 0) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Tag not found on article'
-      });
-    }
-
-    logger.info('Tag removed from article', { articleId: id, tagId });
-
-    res.json({
-      success: true,
-      message: 'Tag removed successfully'
-    });
-  })
-);
 
 export default router;

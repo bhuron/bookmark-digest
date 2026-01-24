@@ -6,7 +6,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 ### Core Features
 1. **Browser Extension**: Capture rendered DOM from active tabs (bypasses paywalls)
 2. **Article Processing**: Extract clean content using Mozilla's Readability
-3. **Local Storage**: SQLite database with tagging, search, and filtering
+3. **Local Storage**: SQLite database with search and filtering
 4. **EPUB Generation**: Batch convert multiple articles to single EPUB
 5. **Kindle Integration**: Automatic email delivery via Amazon's Send-to-Kindle
 6. **Web Interface**: React-based UI for article management
@@ -31,6 +31,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 4. **Enhanced DOMPurify configuration** - Preserves HTML attributes for proper styling
 5. **Database path corrections** - Updated existing articles with correct image paths
 6. **EPUB library replacement** - Replaced buggy @storyteller-platform/epub with @lesjoursfr/html-to-epub (EPUB 3.3 compliant, image support restored)
+7. **Removed tag system** - Tag feature was broken and removed to simplify the application
 
 **Ready for Use:** The application is fully functional for local use with browser extension capture, web UI management, EPUB generation, and Kindle email delivery.
 
@@ -240,7 +241,7 @@ backend/
 
 ### 3. Database Schema
 
-#### SQLite Tables
+#### SQLite Tables (Note: Tag tables have been removed - tags feature was deprecated)
 ```sql
 -- Articles table
 CREATE TABLE articles (
@@ -764,13 +765,13 @@ module.exports = new KindleService();
 // POST /api/epub/exports/:id/send-to-kindle - Send to Kindle
 ```
 
-#### Tag Routes
+#### Tag Routes (Removed - tag feature deprecated)
 ```javascript
-// GET /api/tags - List all tags
-// POST /api/tags - Create new tag
-// PUT /api/tags/:id - Update tag
-// DELETE /api/tags/:id - Delete tag
-// GET /api/tags/:id/articles - Get articles with tag
+// GET /api/tags - List all tags (REMOVED)
+// POST /api/tags - Create new tag (REMOVED)
+// PUT /api/tags/:id - Update tag (REMOVED)
+// DELETE /api/tags/:id - Delete tag (REMOVED)
+// GET /api/tags/:id/articles - Get articles with tag (REMOVED)
 ```
 
 #### Settings Routes
@@ -796,9 +797,9 @@ frontend/
 │   │   │   ├── ArticleCard.jsx
 │   │   │   ├── ArticleViewer.jsx
 │   │   │   └── ArticleFilters.jsx
-│   │   ├── Tags/
-│   │   │   ├── TagManager.jsx
-│   │   │   └── TagFilter.jsx
+│   │   ├── Tags/ (REMOVED - tag feature deprecated)
+│   │   │   ├── TagManager.jsx (REMOVED)
+│   │   │   └── TagFilter.jsx (REMOVED)
 │   │   ├── EPUB/
 │   │   │   ├── EPUBGenerator.jsx
 │   │   │   ├── ExportHistory.jsx
@@ -810,12 +811,12 @@ frontend/
 │   ├── pages/
 │   │   ├── Home.jsx
 │   │   ├── Articles.jsx
-│   │   ├── Tags.jsx
+│   │   ├── Tags.jsx (REMOVED)
 │   │   ├── Settings.jsx
 │   │   └── EPUB.jsx
 │   ├── hooks/
 │   │   ├── useArticles.js
-│   │   ├── useTags.js
+│   │   ├── useTags.js (REMOVED)
 │   │   └── useEPUB.js
 │   ├── services/
 │   │   ├── api.js
@@ -1084,7 +1085,7 @@ async function getArticlesWithCache(options) {
 ### Phase 2: Article Processing ✅ COMPLETE
 - [x] Integrate @mozilla/readability + jsdom + DOMPurify for content extraction
 - [x] Implement image downloading and replacement with Sharp optimization
-- [x] Add tag management system with normalized lowercase tags
+- [x] Add tag management system with normalized lowercase tags (REMOVED - feature deprecated)
 - [x] Create search functionality across title, content, and excerpt
 
 ### Phase 3: Browser Extension ✅ COMPLETE
@@ -1097,7 +1098,7 @@ async function getArticlesWithCache(options) {
 - [x] Set up React frontend with Vite + Tailwind CSS + TanStack Query
 - [x] Create article listing with pagination, filtering, and sorting
 - [x] Implement article viewer with typography improvements
-- [x] Add tag management interface with color coding
+- [x] Add tag management interface with color coding (REMOVED - feature deprecated)
 
 ### Phase 5: EPUB Generation ✅ COMPLETE
 - [x] Integrate @lesjoursfr/html-to-epub library (EPUB 3.3 compliant)

@@ -1,10 +1,9 @@
 import { Link, NavLink } from 'react-router-dom';
-import { BookOpen, FileText, Tag, Settings, Book } from 'lucide-react';
+import { BookOpen, FileText, Settings, Book } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 const navItems = [
   { to: '/', icon: FileText, label: 'Articles' },
-  { to: '/tags', icon: Tag, label: 'Tags' },
   { to: '/epub', icon: Book, label: 'EPUB' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];

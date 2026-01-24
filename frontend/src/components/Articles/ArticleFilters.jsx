@@ -20,9 +20,6 @@ const filterOptions = {
 export default function ArticleFilters({
   filters,
   onFiltersChange,
-  tags,
-  selectedTag,
-  onTagChange,
 }) {
   return (
     <div className="card p-4 mb-6">
@@ -59,21 +56,7 @@ export default function ArticleFilters({
             ))}
           </select>
 
-          {/* Tag Filter */}
-          {tags && tags.length > 0 && (
-            <select
-              value={selectedTag || ''}
-              onChange={(e) => onTagChange(e.target.value || null)}
-              className="input w-auto"
-            >
-              <option value="">All Tags</option>
-              {tags.map((tag) => (
-                <option key={tag.id} value={tag.name}>
-                  {tag.name} ({tag.article_count})
-                </option>
-              ))}
-            </select>
-          )}
+
         </div>
       </div>
     </div>

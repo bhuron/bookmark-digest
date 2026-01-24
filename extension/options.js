@@ -3,9 +3,11 @@
 const API_BASE = 'http://localhost:3001';
 const STORAGE_KEY_API = 'bookmarkDigestApiKey';
 
+
 // DOM elements
 const apiKeyInput = document.getElementById('api-key');
 const apiUrlInput = document.getElementById('api-url');
+
 const settingsForm = document.getElementById('settings-form');
 const saveBtn = document.getElementById('save-btn');
 const testBtn = document.getElementById('test-btn');
@@ -54,7 +56,9 @@ async function loadSettings() {
  */
 async function saveSettings(apiKey) {
   return new Promise((resolve, reject) => {
-    chrome.storage.local.set({ [STORAGE_KEY_API]: apiKey }, () => {
+    chrome.storage.local.set({
+      [STORAGE_KEY_API]: apiKey
+    }, () => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError);
       } else {

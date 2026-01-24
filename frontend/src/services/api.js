@@ -41,20 +41,11 @@ export const articlesApi = {
   create: (data) => api.post('/articles', data),
   update: (id, data) => api.put(`/articles/${id}`, data),
   delete: (id) => api.delete(`/articles/${id}`),
-  addTags: (id, tags) => api.post(`/articles/${id}/tags`, { tags }),
-  removeTag: (id, tagId) => api.delete(`/articles/${id}/tags/${tagId}`),
+
   getStats: () => api.get('/articles/stats'),
 };
 
-// Tags API
-export const tagsApi = {
-  list: () => api.get('/tags'),
-  get: (id) => api.get(`/tags/${id}`),
-  create: (data) => api.post('/tags', data),
-  update: (id, data) => api.put(`/tags/${id}`, data),
-  delete: (id) => api.delete(`/tags/${id}`),
-  getArticles: (id, params) => api.get(`/tags/${id}/articles`, { params }),
-};
+
 
 // EPUB API
 export const epubApi = {
