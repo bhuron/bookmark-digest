@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { articlesApi, settingsApi } from '../services/api';
-import { Key, Check, AlertCircle, Mail } from 'lucide-react';
+import { Key, Check, AlertCircle, Mail, BarChart3 } from 'lucide-react';
 
 export default function Settings() {
   const [apiKey, setApiKey] = useState(localStorage.getItem('bookmark_digest_api_key') || '');
@@ -26,7 +26,7 @@ export default function Settings() {
     enabled: !!localStorage.getItem('bookmark_digest_api_key'),
   });
 
-  const { data: _settings } = useQuery({ // eslint-disable-line no-unused-vars
+  const { data: _settings } = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
       const response = await settingsApi.get();
@@ -86,7 +86,6 @@ export default function Settings() {
   const handleSaveApiKey = () => {
     localStorage.setItem('bookmark_digest_api_key', apiKey.trim());
     setStatus('saved');
-    // Invalidate stats query to trigger refetch with new API key
     queryClient.invalidateQueries({ queryKey: ['stats'] });
     setTimeout(() => setStatus(null), 3000);
   };
@@ -95,7 +94,6 @@ export default function Settings() {
     localStorage.removeItem('bookmark_digest_api_key');
     setApiKey('');
     setStatus('cleared');
-    // Clear stats query
     queryClient.clear();
     setTimeout(() => setStatus(null), 3000);
   };
@@ -119,278 +117,343 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+    <div className="max-w-3xl animate-fade-in-up">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 tracking-tight mb-2">
+          Settings
+        </h1>
+        <p className="text-gallery-500 text-lg">
+          Configure your application preferences
+        </p>
+      </div>
 
-      {/* API Key Section */}
-      <div className="card mb-6">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Key className="w-5 h-5 mr-2" />
-            API Configuration
-          </h2>
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 mb-2">
-                API Key
-              </label>
-              <input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="Enter your API key from config.json"
-                className="input"
-              />
-              <p className="mt-2 text-sm text-gray-500">
-                The API key is stored in <code className="bg-gray-100 px-1 py-0.5 rounded">backend/config.json</code>
-              </p>
+      <div className="space-y-6">
+        {/* API Key Section */}
+        <div className="card">
+          <div className="p-6 lg:p-7">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gallery-100 rounded-lg p-2.5">
+                <Key className="w-5 h-5 text-gallery-700" strokeWidth={2} />
+              </div>
+              <div>
+                <h2 className="font-display font-semibold text-xl text-gallery-900">
+                  API Configuration
+                </h2>
+                <p className="text-sm text-gallery-500 mt-0.5">
+                  Connect to your backend server
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button onClick={handleSaveApiKey} className="btn btn-primary">
-                Save API Key
-              </button>
-              {apiKey && (
-                <>
-                  <button onClick={handleTestConnection} className="btn btn-secondary">
-                    Test Connection
-                  </button>
-                  <button onClick={handleClearApiKey} className="btn btn-ghost text-red-600">
-                    Clear
-                  </button>
-                </>
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="apiKey" className="block text-sm font-semibold text-gallery-700 mb-2">
+                  API Key
+                </label>
+                <input
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Enter your API key"
+                  className="input font-mono text-sm"
+                />
+                <p className="mt-2 text-sm text-gallery-500 flex items-center gap-1.5">
+                  <svg className="w-4 h-4 text-gallery-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 16.5L9 21m0 0l-4.5-4.5M9 21V9a2.25 2.25 0 012.25-2.25h5.25A2.25 2.25 0 0118.5 9v12" />
+                  </svg>
+                  Found in <code className="bg-gallery-100 px-2 py-0.5 rounded text-xs font-mono text-gallery-700">backend/config.json</code>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={handleSaveApiKey} className="btn btn-primary">
+                  Save API Key
+                </button>
+                {apiKey && (
+                  <>
+                    <button onClick={handleTestConnection} className="btn btn-secondary">
+                      {status === 'testing' ? 'Testing...' : 'Test Connection'}
+                    </button>
+                    <button onClick={handleClearApiKey} className="btn btn-ghost text-red-600">
+                      Clear
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Status Messages */}
+              {status === 'saved' && (
+                <div className="flex items-center text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-lg">
+                  <Check className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2.5} />
+                  <span>API key saved successfully</span>
+                </div>
+              )}
+              {status === 'cleared' && (
+                <div className="flex items-center text-sm text-gallery-700 bg-gallery-100 px-4 py-3 rounded-lg">
+                  <Check className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2.5} />
+                  <span>API key cleared</span>
+                </div>
+              )}
+              {status === 'success' && (
+                <div className="flex items-center text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-lg">
+                  <Check className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2.5} />
+                  <span>Connection successful! Your API key is working.</span>
+                </div>
+              )}
+              {status === 'error' && (
+                <div className="flex items-center text-sm text-red-700 bg-red-50 px-4 py-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2} />
+                  <span>Connection failed. Please check your API key.</span>
+                </div>
               )}
             </div>
-
-            {/* Status Messages */}
-            {status === 'saved' && (
-              <div className="flex items-center text-sm text-green-600">
-                <Check className="w-4 h-4 mr-1" />
-                API key saved successfully
-              </div>
-            )}
-            {status === 'cleared' && (
-              <div className="flex items-center text-sm text-gray-600">
-                <Check className="w-4 h-4 mr-1" />
-                API key cleared
-              </div>
-            )}
-            {status === 'testing' && (
-              <div className="text-sm text-gray-600">Testing connection...</div>
-            )}
-            {status === 'success' && (
-              <div className="flex items-center text-sm text-green-600">
-                <Check className="w-4 h-4 mr-1" />
-                Connection successful
-              </div>
-            )}
-            {status === 'error' && (
-              <div className="flex items-center text-sm text-red-600">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                Connection failed. Please check your API key.
-              </div>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* SMTP Settings Section */}
-      <div className="card mb-6">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Mail className="w-5 h-5 mr-2" />
-            Kindle Email Configuration
-          </h2>
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="kindleEmail" className="block text-sm font-medium text-gray-700 mb-2">
-                Kindle Email Address
-              </label>
-              <input
-                id="kindleEmail"
-                type="email"
-                value={smtpSettings.kindleEmail}
-                onChange={(e) => setSmtpSettings({...smtpSettings, kindleEmail: e.target.value})}
-                placeholder="your_kindle_email@kindle.com"
-                className="input"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="smtpHost" className="block text-sm font-medium text-gray-700 mb-2">
-                  SMTP Host
-                </label>
-                <input
-                  id="smtpHost"
-                  type="text"
-                  value={smtpSettings.smtpHost}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, smtpHost: e.target.value})}
-                  placeholder="smtp.gmail.com"
-                  className="input"
-                />
-              </div>
-              <div>
-                <label htmlFor="smtpPort" className="block text-sm font-medium text-gray-700 mb-2">
-                  SMTP Port
-                </label>
-                <input
-                  id="smtpPort"
-                  type="number"
-                  value={smtpSettings.smtpPort}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, smtpPort: e.target.value})}
-                  placeholder="587"
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="smtpUser" className="block text-sm font-medium text-gray-700 mb-2">
-                  SMTP Username
-                </label>
-                <input
-                  id="smtpUser"
-                  type="text"
-                  value={smtpSettings.smtpUser}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, smtpUser: e.target.value})}
-                  placeholder="your_email@gmail.com"
-                  className="input"
-                />
-              </div>
-              <div>
-                <label htmlFor="smtpPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                  SMTP Password
-                </label>
-                <input
-                  id="smtpPassword"
-                  type="password"
-                  value={smtpSettings.smtpPassword}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, smtpPassword: e.target.value})}
-                  placeholder="Your SMTP password"
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="fromEmail" className="block text-sm font-medium text-gray-700 mb-2">
-                  From Email (Optional)
-                </label>
-                <input
-                  id="fromEmail"
-                  type="email"
-                  value={smtpSettings.fromEmail}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, fromEmail: e.target.value})}
-                  placeholder="sender@example.com"
-                  className="input"
-                />
-              </div>
-              <div>
-                <label htmlFor="smtpSecure" className="block text-sm font-medium text-gray-700 mb-2">
-                  SMTP Secure
-                </label>
-                <select
-                  id="smtpSecure"
-                  value={smtpSettings.smtpSecure}
-                  onChange={(e) => setSmtpSettings({...smtpSettings, smtpSecure: e.target.value})}
-                  className="input"
-                >
-                  <option value="false">False (STARTTLS)</option>
-                  <option value="true">True (SSL/TLS)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSaveSmtpSettings}
-                disabled={updateSettingsMutation.isPending}
-                className="btn btn-primary"
-              >
-                {updateSettingsMutation.isPending ? 'Saving...' : 'Save SMTP Settings'}
-              </button>
-              <button
-                onClick={handleTestSmtp}
-                disabled={testSmtpMutation.isPending}
-                className="btn btn-secondary"
-              >
-                {testSmtpMutation.isPending ? 'Testing...' : 'Test SMTP Connection'}
-              </button>
-            </div>
-
-            {/* SMTP Status Messages */}
-            {status === 'smtp-saved' && (
-              <div className="flex items-center text-sm text-green-600">
-                <Check className="w-4 h-4 mr-1" />
-                SMTP settings saved successfully
-              </div>
-            )}
-            {status === 'smtp-error' && (
-              <div className="flex items-center text-sm text-red-600">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                Failed to save SMTP settings
-              </div>
-            )}
-            {status === 'smtp-test-success' && (
-              <div className="flex items-center text-sm text-green-600">
-                <Check className="w-4 h-4 mr-1" />
-                SMTP connection test successful
-              </div>
-            )}
-            {status === 'smtp-test-error' && (
-              <div className="flex items-center text-sm text-red-600">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                SMTP connection test failed
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Section */}
-      {stats && (
+        {/* SMTP Settings Section */}
         <div className="card">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-2xl font-bold text-primary-600">{stats.total_articles}</div>
-                <div className="text-sm text-gray-500">Total Articles</div>
+          <div className="p-6 lg:p-7">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gallery-100 rounded-lg p-2.5">
+                <Mail className="w-5 h-5 text-gallery-700" strokeWidth={2} />
               </div>
               <div>
-                <div className="text-2xl font-bold text-primary-600">{stats.unread_articles}</div>
-                <div className="text-sm text-gray-500">Unread</div>
+                <h2 className="font-display font-semibold text-xl text-gallery-900">
+                  Kindle Email Configuration
+                </h2>
+                <p className="text-sm text-gallery-500 mt-0.5">
+                  Send EPUBs directly to your Kindle
+                </p>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-primary-600">{stats.favorite_articles}</div>
-                <div className="text-sm text-gray-500">Favorites</div>
+            </div>
+
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div>
+                  <label htmlFor="kindleEmail" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    Kindle Email Address
+                  </label>
+                  <input
+                    id="kindleEmail"
+                    type="email"
+                    value={smtpSettings.kindleEmail}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, kindleEmail: e.target.value})}
+                    placeholder="your_kindle@kindle.com"
+                    className="input"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="smtpHost" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    SMTP Host
+                  </label>
+                  <input
+                    id="smtpHost"
+                    type="text"
+                    value={smtpSettings.smtpHost}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, smtpHost: e.target.value})}
+                    placeholder="smtp.gmail.com"
+                    className="input"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="smtpPort" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    SMTP Port
+                  </label>
+                  <input
+                    id="smtpPort"
+                    type="number"
+                    value={smtpSettings.smtpPort}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, smtpPort: e.target.value})}
+                    placeholder="587"
+                    className="input"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="smtpSecure" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    Security
+                  </label>
+                  <select
+                    id="smtpSecure"
+                    value={smtpSettings.smtpSecure}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, smtpSecure: e.target.value})}
+                    className="input"
+                  >
+                    <option value="false">STARTTLS</option>
+                    <option value="true">SSL/TLS</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="smtpUser" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    SMTP Username
+                  </label>
+                  <input
+                    id="smtpUser"
+                    type="text"
+                    value={smtpSettings.smtpUser}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, smtpUser: e.target.value})}
+                    placeholder="your_email@gmail.com"
+                    className="input"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="smtpPassword" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    SMTP Password
+                  </label>
+                  <input
+                    id="smtpPassword"
+                    type="password"
+                    value={smtpSettings.smtpPassword}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, smtpPassword: e.target.value})}
+                    placeholder="Your SMTP password"
+                    className="input"
+                  />
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label htmlFor="fromEmail" className="block text-sm font-semibold text-gallery-700 mb-2">
+                    From Email <span className="text-gallery-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="fromEmail"
+                    type="email"
+                    value={smtpSettings.fromEmail}
+                    onChange={(e) => setSmtpSettings({...smtpSettings, fromEmail: e.target.value})}
+                    placeholder="sender@example.com"
+                    className="input"
+                  />
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-primary-600">{stats.archived_articles}</div>
-                <div className="text-sm text-gray-500">Archived</div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  onClick={handleSaveSmtpSettings}
+                  disabled={updateSettingsMutation.isPending}
+                  className="btn btn-primary"
+                >
+                  {updateSettingsMutation.isPending ? 'Saving...' : 'Save SMTP Settings'}
+                </button>
+                <button
+                  onClick={handleTestSmtp}
+                  disabled={testSmtpMutation.isPending}
+                  className="btn btn-secondary"
+                >
+                  {testSmtpMutation.isPending ? 'Testing...' : 'Test SMTP'}
+                </button>
               </div>
+
+              {/* SMTP Status Messages */}
+              {status === 'smtp-saved' && (
+                <div className="flex items-center text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-lg">
+                  <Check className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2.5} />
+                  <span>SMTP settings saved successfully</span>
+                </div>
+              )}
+              {status === 'smtp-error' && (
+                <div className="flex items-center text-sm text-red-700 bg-red-50 px-4 py-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2} />
+                  <span>Failed to save SMTP settings</span>
+                </div>
+              )}
+              {status === 'smtp-test-success' && (
+                <div className="flex items-center text-sm text-emerald-700 bg-emerald-50 px-4 py-3 rounded-lg">
+                  <Check className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2.5} />
+                  <span>SMTP connection test successful!</span>
+                </div>
+              )}
+              {status === 'smtp-test-error' && (
+                <div className="flex items-center text-sm text-red-700 bg-red-50 px-4 py-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" strokeWidth={2} />
+                  <span>SMTP connection test failed. Please check your settings.</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Browser Extension Instructions */}
-      <div className="card mt-6">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Browser Extension Setup</h2>
-          <ol className="list-decimal list-inside space-y-2 text-gray-600">
-            <li>Open your browser and navigate to <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">chrome://extensions</code></li>
-             <li>Enable &quot;Developer mode&quot; in the top right</li>
-             <li>Click &quot;Load unpacked&quot; and select the <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">extension</code> folder</li>
-            <li>Click the extension icon to configure your API key</li>
-            <li>Navigate to any article page and click the extension to save it</li>
-          </ol>
+        {/* Stats Section */}
+        {stats && (
+          <div className="card">
+            <div className="p-6 lg:p-7">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gallery-100 rounded-lg p-2.5">
+                  <BarChart3 className="w-5 h-5 text-gallery-700" strokeWidth={2} />
+                </div>
+                <div>
+                  <h2 className="font-display font-semibold text-xl text-gallery-900">
+                    Statistics
+                  </h2>
+                  <p className="text-sm text-gallery-500 mt-0.5">
+                    Overview of your reading library
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gallery-50 rounded-xl p-5 text-center">
+                  <div className="font-display font-bold text-3xl text-gallery-900 mb-1">
+                    {stats.total_articles}
+                  </div>
+                  <div className="text-sm text-gallery-600 font-medium">Total Articles</div>
+                </div>
+                <div className="bg-gallery-50 rounded-xl p-5 text-center">
+                  <div className="font-display font-bold text-3xl text-coral-500 mb-1">
+                    {stats.unread_articles}
+                  </div>
+                  <div className="text-sm text-gallery-600 font-medium">Unread</div>
+                </div>
+                <div className="bg-gallery-50 rounded-xl p-5 text-center">
+                  <div className="font-display font-bold text-3xl text-amber-500 mb-1">
+                    {stats.favorite_articles}
+                  </div>
+                  <div className="text-sm text-gallery-600 font-medium">Favorites</div>
+                </div>
+                <div className="bg-gallery-50 rounded-xl p-5 text-center">
+                  <div className="font-display font-bold text-3xl text-gallery-600 mb-1">
+                    {stats.archived_articles}
+                  </div>
+                  <div className="text-sm text-gallery-600 font-medium">Archived</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Browser Extension Instructions */}
+        <div className="card">
+          <div className="p-6 lg:p-7">
+            <h2 className="font-display font-semibold text-xl text-gallery-900 mb-5">
+              Browser Extension Setup
+            </h2>
+            <ol className="space-y-3 text-gallery-700">
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">1</span>
+                <span className="pt-0.5">Open <code className="bg-gallery-100 px-2 py-0.5 rounded text-sm font-mono">chrome://extensions</code> in your browser</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">2</span>
+                <span className="pt-0.5">Enable "Developer mode" in the top right corner</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">3</span>
+                <span className="pt-0.5">Click "Load unpacked" and select the <code className="bg-gallery-100 px-2 py-0.5 rounded text-sm font-mono">extension</code> folder</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">4</span>
+                <span className="pt-0.5">Click the extension icon to configure your API key</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">5</span>
+                <span className="pt-0.5">Navigate to any article and click the extension to save it</span>
+              </li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>

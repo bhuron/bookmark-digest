@@ -14,7 +14,6 @@ export default function Articles() {
     sortBy: 'created_at',
   });
 
-
   // Fetch articles
   const { data: articlesData, isLoading: articlesLoading } = useQuery({
     queryKey: ['articles', page, search, filters],
@@ -29,8 +28,6 @@ export default function Articles() {
       }),
   });
 
-
-
   const articles = articlesData?.data?.data?.articles || [];
   const total = articlesData?.data?.data?.total || 0;
 
@@ -40,20 +37,32 @@ export default function Articles() {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Articles</h1>
+    <div className="animate-fade-in-up">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 tracking-tight mb-2">
+          Library
+        </h1>
+        <p className="text-gallery-500 text-lg">
+          Your curated collection of saved articles
+        </p>
       </div>
 
+      {/* Search */}
       <SearchBar value={search} onChange={handleSearch} />
 
+      {/* Filters */}
       <ArticleFilters
         filters={filters}
         onFiltersChange={setFilters}
       />
 
-      <ArticleList articles={articles} isLoading={articlesLoading} />
+      {/* Article List */}
+      <div className="mt-6">
+        <ArticleList articles={articles} isLoading={articlesLoading} />
+      </div>
 
+      {/* Pagination */}
       <Pagination page={page} limit={20} total={total} onPageChange={setPage} />
     </div>
   );

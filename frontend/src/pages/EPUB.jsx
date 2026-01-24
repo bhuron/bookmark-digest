@@ -7,8 +7,8 @@ import { formatDistanceToNow } from 'date-fns';
 export default function EPUB() {
   const [selectedArticles, setSelectedArticles] = useState(new Set());
   const [epubTitle, setEpubTitle] = useState('');
-  const [page, setPage] = useState(1); // eslint-disable-line no-unused-vars
-  const [limit, setLimit] = useState(20); // eslint-disable-line no-unused-vars
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
   const queryClient = useQueryClient();
 
   // Fetch articles with pagination
@@ -65,7 +65,7 @@ export default function EPUB() {
   });
 
   const articles = articlesData?.data?.articles || [];
-  const _totalArticles = articlesData?.data?.total || 0; // eslint-disable-line no-unused-vars
+  const _totalArticles = articlesData?.data?.total || 0;
   const exports = exportsData || [];
 
   const toggleArticleSelection = (articleId) => {
@@ -132,185 +132,212 @@ export default function EPUB() {
   };
 
   return (
-    <div className="max-w-6xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-        <Book className="w-6 h-6 mr-2" />
-        EPUB Generation
-      </h1>
+    <div className="max-w-6xl animate-fade-in-up">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 tracking-tight mb-2">
+          EPUB Generation
+        </h1>
+        <p className="text-gallery-500 text-lg">
+          Create beautiful ebooks from your saved articles
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left column: Article selection */}
-        <div>
-          <div className="card mb-6">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Select Articles ({selectedArticles.size} selected)
+        <div className="space-y-6">
+          {/* Selection Card */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display font-semibold text-xl text-gallery-900">
+                Select Articles
               </h2>
+              <span className="badge badge-default">
+                {selectedArticles.size} selected
+              </span>
+            </div>
 
-              <div className="mb-4">
-                <label htmlFor="epubTitle" className="block text-sm font-medium text-gray-700 mb-2">
-                  EPUB Title (optional)
-                </label>
-                <input
-                  id="epubTitle"
-                  type="text"
-                  value={epubTitle}
-                  onChange={(e) => setEpubTitle(e.target.value)}
-                  placeholder="My Reading Digest"
-                  className="input"
-                />
+            {/* EPUB Title Input */}
+            <div className="mb-5">
+              <label htmlFor="epubTitle" className="block text-sm font-semibold text-gallery-700 mb-2">
+                EPUB Title <span className="text-gallery-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="epubTitle"
+                type="text"
+                value={epubTitle}
+                onChange={(e) => setEpubTitle(e.target.value)}
+                placeholder="My Reading Digest"
+                className="input"
+              />
+            </div>
+
+            {/* Select All Button */}
+            <div className="flex items-center justify-between mb-5 pb-5 border-b border-gallery-200">
+              <button
+                onClick={selectAllArticles}
+                className="btn btn-ghost text-sm"
+              >
+                {selectedArticles.size === articles.length ? 'Deselect All' : 'Select All'}
+              </button>
+              <span className="text-sm text-gallery-500">
+                {articles.length} articles
+              </span>
+            </div>
+
+            {/* Article List */}
+            {articlesLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader className="w-6 h-6 animate-spin text-gallery-400" strokeWidth={2} />
               </div>
-
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  onClick={selectAllArticles}
-                  className="btn btn-ghost text-sm"
-                >
-                  {selectedArticles.size === articles.length ? 'Deselect All' : 'Select All'}
-                </button>
-                <span className="text-sm text-gray-500">
-                  {articles.length} articles
-                </span>
+            ) : articles.length === 0 ? (
+              <div className="text-center py-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gallery-100 mb-3">
+                  <Book className="w-6 h-6 text-gallery-400" strokeWidth={2} />
+                </div>
+                <p className="text-gallery-500 text-sm">No articles found. Save some articles first!</p>
               </div>
-
-              {articlesLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader className="w-6 h-6 animate-spin text-gray-400" />
-                </div>
-              ) : articles.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No articles found. Save some articles first!
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {articles.map((article) => (
-                    <div
-                      key={article.id}
-                      className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedArticles.has(article.id)}
-                        onChange={() => toggleArticleSelection(article.id)}
-                        className="h-4 w-4 text-primary-600 rounded"
-                      />
-                      <div className="ml-3 flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {article.title}
-                        </div>
-                         <div className="text-xs text-gray-500">
-                           {article.site_name || getHostname(article.url)}
-                           {article.word_count && ` • ${article.word_count} words`}
-                         </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                {articles.map((article) => (
+                  <div
+                    key={article.id}
+                    className="flex items-center gap-3 p-3 border border-gallery-200 rounded-lg hover:border-gallery-300 hover:bg-gallery-50/50 transition-all duration-200 cursor-pointer"
+                    onClick={() => toggleArticleSelection(article.id)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedArticles.has(article.id)}
+                      onChange={() => toggleArticleSelection(article.id)}
+                      className="h-4 w-4 text-coral-500 rounded focus:ring-coral-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gallery-900 truncate">
+                        {article.title}
+                      </div>
+                      <div className="text-xs text-gallery-500 mt-0.5">
+                        {article.site_name || getHostname(article.url)}
+                        {article.word_count && (
+                          <span> • {article.word_count} words</span>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Generate Button */}
+            <div className="mt-6 pt-6 border-t border-gallery-200">
+              <button
+                onClick={handleGenerateEpub}
+                disabled={generateEpubMutation.isPending || selectedArticles.size === 0}
+                className="btn btn-coral w-full"
+              >
+                {generateEpubMutation.isPending ? (
+                  <>
+                    <Loader className="w-4 h-4 mr-2 animate-spin" strokeWidth={2} />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Book className="w-4 h-4 mr-2" strokeWidth={2} />
+                    Generate EPUB
+                  </>
+                )}
+              </button>
+              {generateEpubMutation.isError && (
+                <div className="mt-3 flex items-center text-sm text-red-600">
+                  <AlertCircle className="w-4 h-4 mr-1.5 flex-shrink-0" strokeWidth={2} />
+                  <span>Failed to generate EPUB: {generateEpubMutation.error.message}</span>
                 </div>
               )}
-
-              <div className="mt-6">
-                <button
-                  onClick={handleGenerateEpub}
-                  disabled={generateEpubMutation.isPending || selectedArticles.size === 0}
-                  className="btn btn-primary w-full"
-                >
-                  {generateEpubMutation.isPending ? (
-                    <>
-                      <Loader className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Book className="w-4 h-4 mr-2" />
-                      Generate EPUB ({selectedArticles.size} articles)
-                    </>
-                  )}
-                </button>
-                {generateEpubMutation.isError && (
-                  <div className="mt-2 flex items-center text-sm text-red-600">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    Failed to generate EPUB: {generateEpubMutation.error.message}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
 
         {/* Right column: Export history */}
         <div>
-          <div className="card">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Export History
-              </h2>
+          <div className="card p-6">
+            <h2 className="font-display font-semibold text-xl text-gallery-900 mb-5">
+              Export History
+            </h2>
 
-              {exportsLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader className="w-6 h-6 animate-spin text-gray-400" />
+            {exportsLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader className="w-6 h-6 animate-spin text-gallery-400" strokeWidth={2} />
+              </div>
+            ) : exports.length === 0 ? (
+              <div className="text-center py-10">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gallery-100 mb-3">
+                  <Download className="w-6 h-6 text-gallery-400" strokeWidth={2} />
                 </div>
-              ) : exports.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No EPUB exports yet. Generate your first EPUB!
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {exports.map((exportItem) => (
-                    <div key={exportItem.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {exportItem.name}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            Created {formatDistanceToNow(new Date(exportItem.created_at), { addSuffix: true })}
-                            {exportItem.article_count && ` • ${exportItem.article_count} articles`}
-                            {exportItem.file_size && ` • ${Math.round(exportItem.file_size / 1024 / 1024 * 100) / 100} MB`}
-                          </div>
-                          <div className="mt-2">
-                            {exportItem.sent_to_kindle ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <Check className="w-3 h-3 mr-1" />
-                                Sent to Kindle
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                Not sent
-                              </span>
-                            )}
-                          </div>
+                <p className="text-gallery-500 text-sm">No EPUB exports yet. Generate your first EPUB!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {exports.map((exportItem) => (
+                  <div key={exportItem.id} className="border border-gallery-200 rounded-xl p-5 hover:border-gallery-300 transition-colors duration-200">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gallery-900 truncate mb-1">
+                          {exportItem.name}
                         </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => handleDownloadEpub(exportItem.id)}
-                            disabled={downloadEpubMutation.isPending}
-                            className="btn btn-ghost btn-sm"
-                            title="Download EPUB"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleSendToKindle(exportItem.id)}
-                            disabled={sendToKindleMutation.isPending || exportItem.sent_to_kindle}
-                            className="btn btn-ghost btn-sm"
-                            title="Send to Kindle"
-                          >
-                            <Mail className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteExport(exportItem.id)}
-                            className="btn btn-ghost btn-sm text-red-600"
-                            title="Delete"
-                          >
-                            &times;
-                          </button>
+                        <div className="text-xs text-gallery-500 mb-3">
+                          Created {formatDistanceToNow(new Date(exportItem.created_at), { addSuffix: true })}
+                          {exportItem.article_count && (
+                            <span> • {exportItem.article_count} articles</span>
+                          )}
+                          {exportItem.file_size && (
+                            <span> • {Math.round(exportItem.file_size / 1024 / 1024 * 100) / 100} MB</span>
+                          )}
+                        </div>
+                        <div>
+                          {exportItem.sent_to_kindle ? (
+                            <span className="badge badge-success">
+                              <Check className="w-3 h-3 mr-1 fill-current" strokeWidth={2.5} />
+                              Sent to Kindle
+                            </span>
+                          ) : (
+                            <span className="badge badge-default">Not sent</span>
+                          )}
                         </div>
                       </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleDownloadEpub(exportItem.id)}
+                          disabled={downloadEpubMutation.isPending}
+                          className="btn-icon"
+                          title="Download EPUB"
+                          aria-label="Download EPUB"
+                        >
+                          <Download className="w-4 h-4" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => handleSendToKindle(exportItem.id)}
+                          disabled={sendToKindleMutation.isPending || exportItem.sent_to_kindle}
+                          className="btn-icon"
+                          title="Send to Kindle"
+                          aria-label="Send to Kindle"
+                        >
+                          <Mail className="w-4 h-4" strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteExport(exportItem.id)}
+                          className="btn-icon hover:text-red-600 hover:bg-red-50"
+                          title="Delete"
+                          aria-label="Delete export"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

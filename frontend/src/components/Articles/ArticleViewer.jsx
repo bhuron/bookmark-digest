@@ -1,4 +1,3 @@
-
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,7 +9,6 @@ import {
   Calendar,
   Clock,
   FileText,
-
 } from 'lucide-react';
 import { articlesApi } from '../../services/api';
 import LoadingSpinner from '../Common/LoadingSpinner';
@@ -20,7 +18,6 @@ export default function ArticleViewer() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -45,8 +42,6 @@ export default function ArticleViewer() {
     onError: (error) => console.error('Failed to delete article:', error),
   });
 
-
-
   const handleToggleFavorite = () => {
     updateMutation.mutate({ is_favorite: !article?.is_favorite });
   };
@@ -61,11 +56,9 @@ export default function ArticleViewer() {
     }
   };
 
-
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-16">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -73,110 +66,153 @@ export default function ArticleViewer() {
 
   if (!article) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">Article not found</p>
+      <div className="text-center py-16 animate-fade-in-up">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gallery-100 mb-5">
+          <svg className="w-8 h-8 text-gallery-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <p className="text-gallery-900 font-semibold text-lg">Article not found</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to articles
-        </button>
+    <div className="max-w-4xl mx-auto animate-fade-in-up">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate('/')}
+        className="flex items-center gap-2 text-gallery-600 hover:text-gallery-900 transition-colors duration-200 mb-8 group"
+      >
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" strokeWidth={2.5} />
+        <span className="font-medium">Back to library</span>
+      </button>
 
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-3xl font-bold text-gray-900 flex-1">{article.title}</h1>
+      {/* Article Header */}
+      <div className="mb-10">
+        {/* Title */}
+        <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 leading-tight tracking-tight mb-6">
+          {article.title}
+        </h1>
 
+        {/* Metadata Bar */}
+        <div className="flex flex-wrap items-center gap-y-3 gap-x-6 text-sm text-gallery-600 pb-6 border-b border-gallery-200">
+          {article.author && (
+            <span className="font-semibold text-gallery-800">
+              {article.author}
+            </span>
+          )}
+          {article.site_name && (
+            <>
+              {article.author && <span className="text-gallery-300">·</span>}
+              <span>{article.site_name}</span>
+            </>
+          )}
+          {article.created_at && (
+            <>
+              <span className="text-gallery-300">·</span>
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" strokeWidth={2} />
+                {formatRelativeTime(article.created_at)}
+              </span>
+            </>
+          )}
+          {article.reading_time_minutes && (
+            <>
+              <span className="text-gallery-300">·</span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+                {formatReadingTime(article.reading_time_minutes)}
+              </span>
+            </>
+          )}
+          {article.word_count && (
+            <>
+              <span className="text-gallery-300">·</span>
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" strokeWidth={2} />
+                {formatWordCount(article.word_count)}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Action Bar */}
+        <div className="flex items-center justify-between mt-6">
+          {/* Status Badges */}
+          <div className="flex items-center gap-2">
+            {article.is_favorite && (
+              <div className="badge badge-coral">
+                <Star className="w-3 h-3 mr-1 fill-current" strokeWidth={2.5} />
+                Favorite
+              </div>
+            )}
+            {article.is_archived && (
+              <div className="badge badge-default">
+                <Archive className="w-3 h-3 mr-1" strokeWidth={2.5} />
+                Archived
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <button
               onClick={handleToggleFavorite}
-              className={`p-2 rounded-lg transition-colors ${
-                article.is_favorite
-                  ? 'bg-yellow-100 text-yellow-600'
-                  : 'text-gray-400 hover:bg-gray-100'
-              }`}
+              className={`btn-icon ${article.is_favorite ? 'btn-icon-active' : ''}`}
               title={article.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-label={article.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
             >
-              <Star className="w-5 h-5" fill={article.is_favorite ? 'currentColor' : 'none'} />
+              <Star className="w-5 h-5" fill={article.is_favorite ? 'currentColor' : 'none'} strokeWidth={2} />
             </button>
 
             <button
               onClick={handleToggleArchive}
-              className={`p-2 rounded-lg transition-colors ${
-                article.is_archived
-                  ? 'bg-gray-200 text-gray-600'
-                  : 'text-gray-400 hover:bg-gray-100'
-              }`}
+              className={`btn-icon ${article.is_archived ? 'bg-gallery-100' : ''}`}
               title={article.is_archived ? 'Unarchive' : 'Archive'}
+              aria-label={article.is_archived ? 'Unarchive' : 'Archive'}
             >
-              <Archive className="w-5 h-5" />
+              <Archive className="w-5 h-5" strokeWidth={2} />
             </button>
 
             <button
               onClick={handleDelete}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="btn-icon hover:text-red-600 hover:bg-red-50"
               title="Delete"
+              aria-label="Delete article"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="w-5 h-5" strokeWidth={2} />
             </button>
 
             <a
               href={article.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="btn-icon"
               title="Open original"
+              aria-label="Open original article"
             >
-              <ExternalLink className="w-5 h-5" />
+              <ExternalLink className="w-5 h-5" strokeWidth={2} />
             </a>
           </div>
         </div>
-
-        {/* Metadata */}
-        <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-500">
-          <span className="flex items-center">
-            <Calendar className="w-4 h-4 mr-1" />
-            {formatRelativeTime(article.created_at)}
-          </span>
-          {article.reading_time_minutes && (
-            <span className="flex items-center">
-              <Clock className="w-4 h-4 mr-1" />
-              {formatReadingTime(article.reading_time_minutes)}
-            </span>
-          )}
-          {article.word_count && (
-            <span className="flex items-center">
-              <FileText className="w-4 h-4 mr-1" />
-              {formatWordCount(article.word_count)}
-            </span>
-          )}
-          {article.author && <span>By {article.author}</span>}
-          {article.site_name && <span>{article.site_name}</span>}
-        </div>
-
-
       </div>
 
-      {/* Content */}
-      <div className="card">
+      {/* Article Content */}
+      <article className="card p-8 lg:p-12 shadow-gallery-sm">
         {article.excerpt && (
-          <div className="p-6 border-b border-gray-200">
-            <p className="text-lg text-gray-600 italic">{article.excerpt}</p>
+          <div className="mb-8 pb-8 border-b border-gallery-200">
+            <p className="text-xl text-gallery-600 leading-relaxed italic font-serif">
+              {article.excerpt}
+            </p>
           </div>
         )}
 
         <div
-          className="p-6 prose prose-gray max-w-none prose-lg prose-headings:font-semibold prose-a:text-primary-600"
+          className="prose prose-gallery max-w-none"
           dangerouslySetInnerHTML={{ __html: article.content_html }}
         />
-      </div>
+      </article>
     </div>
   );
 }

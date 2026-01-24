@@ -4,7 +4,7 @@ import ArticleCard from './ArticleCard';
 export default function ArticleList({ articles, isLoading }) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-16">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -12,10 +12,15 @@ export default function ArticleList({ articles, isLoading }) {
 
   if (!articles || articles.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">No articles found</p>
-        <p className="text-gray-400 text-sm mt-2">
-          Use the browser extension to save articles
+      <div className="text-center py-16 animate-fade-in-up">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gallery-100 mb-5">
+          <svg className="w-8 h-8 text-gallery-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+        </div>
+        <p className="text-gallery-900 font-semibold text-lg mb-2">No articles found</p>
+        <p className="text-gallery-500 text-sm">
+          Use the browser extension to save your first article
         </p>
       </div>
     );
@@ -23,8 +28,8 @@ export default function ArticleList({ articles, isLoading }) {
 
   return (
     <div className="space-y-4">
-      {articles.map((article) => (
-        <ArticleCard key={article.id} article={article} />
+      {articles.map((article, index) => (
+        <ArticleCard key={article.id} article={article} index={index} />
       ))}
     </div>
   );

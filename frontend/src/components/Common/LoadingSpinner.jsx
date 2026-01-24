@@ -1,25 +1,25 @@
 export default function LoadingSpinner({ size = 'md' }) {
   const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
+    sm: 'w-5 h-5',
+    md: 'w-10 h-10',
+    lg: 'w-14 h-14',
   };
 
   return (
     <div className="flex items-center justify-center">
       <svg
-        className={`animate-spin ${sizeClasses[size]} text-primary-600`}
+        className={`animate-spin ${sizeClasses[size]} text-gallery-900`}
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
+        strokeWidth={2.5}
+        stroke="currentColor"
       >
-        <circle
+        <path
           className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z"
         />
         <path
           className="opacity-75"

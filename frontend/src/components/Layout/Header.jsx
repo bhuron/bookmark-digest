@@ -10,29 +10,42 @@ const navItems = [
 
 export default function Header() {
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-gallery-200/80 bg-white/80 backdrop-blur-xl">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center space-x-2">
-            <BookOpen className="w-8 h-8 text-primary-600" />
-            <span className="text-xl font-bold text-gray-900">Bookmark Digest</span>
+          {/* Logo */}
+          <Link
+            to="/"
+            className="flex items-center gap-3 group"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-coral-500/10 rounded-xl scale-0 group-hover:scale-100 transition-transform duration-300" />
+              <div className="relative bg-gallery-900 rounded-xl p-2.5 group-hover:bg-gallery-800 transition-colors duration-200">
+                <BookOpen className="w-5 h-5 text-white" strokeWidth={2.5} />
+              </div>
+            </div>
+            <span className="font-display font-bold text-xl tracking-tight text-gallery-900">
+              Bookmark Digest
+            </span>
           </Link>
 
-          <nav className="flex items-center space-x-1">
-            {navItems.map((item) => (
+          {/* Navigation */}
+          <nav className="flex items-center gap-1" aria-label="Main navigation">
+            {navItems.map((item, index) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 animate-fade-in-up',
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'nav-active'
+                      : 'text-gallery-600 hover:text-gallery-900 hover:bg-gallery-100',
                   )
                 }
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <item.icon className="w-4 h-4" />
+                <item.icon className="w-4 h-4" strokeWidth={2} />
                 <span>{item.label}</span>
               </NavLink>
             ))}
