@@ -2,20 +2,40 @@
 
 A local, self-hosted bookmarking and reading digest service that extracts web articles (including paywalled content) directly from browser tabs, saves them for later reading, and can batch convert selected articles to EPUB for Kindle delivery.
 
+## Features
+
+- **Browser Extension** (Chrome/Firefox) - One-click article capture from any webpage
+- **Web UI** - React-based interface for managing articles
+- **EPUB Generation** - Batch convert articles to EPUB 3.3 format
+- **Kindle Integration** - Email EPUBs directly to your Kindle
+- **Local Storage** - SQLite database with all content stored locally
+- **Paywall Support** - Captures content from browser DOM (works with some paywalled content)
+
 ## Current Status
 
-**✅ Backend (Phase 1-3): COMPLETE**
+**✅ Backend: COMPLETE**
 - Node.js/Express server with API key authentication
 - SQLite database with migrations
-- Article processing with Readability
-- EPUB generation with @storyteller-platform/epub
-- Image handling and optimization
+- Article processing with Mozilla Readability
+- EPUB generation with @lesjoursfr/html-to-epub
+- Image handling and optimization (Sharp)
 - All CRUD API endpoints
 
-**🔨 In Progress:**
-- Browser Extension (Phase 4)
-- Frontend UI (Phase 5)
-- Testing (Phase 7)
+**✅ Browser Extension: COMPLETE**
+- Manifest V3 (Chrome/Firefox compatible)
+- One-click article capture
+- Progress indicators and error handling
+- API key configuration
+
+**✅ Frontend: COMPLETE**
+- React + Vite + TanStack Query
+- Article management and filtering
+- EPUB generation interface
+- Kindle settings configuration
+
+**🔨 Testing: PARTIAL**
+- Test infrastructure set up
+- Additional tests needed
 
 ## Quick Start
 
@@ -23,7 +43,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 - Node.js 18+ (Note: Node.js 24 may have compatibility issues with some native modules)
 - npm or yarn
 
-### Backend Setup
+### 1. Backend Setup
 
 ```bash
 cd backend
@@ -37,14 +57,42 @@ The server will:
 2. Initialize the SQLite database
 3. Start on `http://localhost:3001`
 
-### Test the Server
+### 2. Frontend Setup
 
 ```bash
-# Health check (no auth required)
+cd frontend
+npm install
+npm run dev
+```
+
+The web UI will be available at `http://localhost:5173`
+
+On first load, you'll need to enter the API key from `backend/config.json`.
+
+### 3. Browser Extension Installation
+
+1. Open your browser's extension management page:
+   - Chrome: `chrome://extensions`
+   - Firefox: `about:debugging#/runtime/this-firefox`
+
+2. Enable **Developer Mode**
+
+3. Click **Load unpacked** and select the `/extension` directory
+
+4. Click the extension icon to configure:
+   - Set the Backend URL (default: `http://localhost:3001`)
+   - Enter your API key (from `backend/config.json`)
+
+5. Test by clicking the extension icon on any article page
+
+### Verify Installation
+
+```bash
+# Backend health check (no auth required)
 curl http://localhost:3001/health
 
-# API status (requires API key)
-API_KEY="your-api-key-here"
+# Check API status (requires API key)
+API_KEY=$(cat backend/config.json | grep apiKey -A 1 | grep -o '"[^"]*"' | tail -1)
 curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 ```
 
@@ -114,40 +162,55 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 
 ### Articles
 - `POST /api/articles` - Create article from HTML
-- `GET /api/articles` - List articles with pagination
+- `GET /api/articles` - List articles with pagination and filtering
+  - Query params: `?page=1&limit=20&search=query&is_archived=false`
 - `GET /api/articles/:id` - Get single article
-- `PUT /api/articles/:id` - Update article
+- `PUT /api/articles/:id` - Update article properties
 - `DELETE /api/articles/:id` - Delete article
-- `GET /api/articles/stats` - Get statistics
+- `GET /api/articles/stats` - Get aggregated statistics
 
 ### EPUB
 - `POST /api/epub/generate` - Generate EPUB from articles
-- `GET /api/epub/exports` - List exports
+  - Body: `{ articleIds: [], title?, author? }`
+- `GET /api/epub/exports` - List export history
 - `GET /api/epub/exports/:id` - Get export details
-- `GET /api/epub/exports/:id/download` - Download EPUB
+- `GET /api/epub/exports/:id/download` - Download EPUB file
 - `DELETE /api/epub/exports/:id` - Delete export
-- `POST /api/epub/exports/:id/send-to-kindle` - Send to Kindle
+- `POST /api/epub/exports/:id/send-to-kindle` - Email EPUB to Kindle
+
+### Settings
+- `GET /api/settings` - Get all application settings
+- `PUT /api/settings` - Update settings (e.g., Kindle/SMTP configuration)
+- `POST /api/settings/test-smtp` - Test SMTP configuration
 
 
 
 ## Database
 
 SQLite database with the following tables:
-- `articles` - Stored articles with metadata
-- `article_images` - Downloaded images
+- `articles` - Stored articles with metadata (title, url, author, reading time, etc.)
+- `article_images` - Downloaded images linked to articles
 - `epub_exports` - EPUB export history
-- `settings` - Application settings
+- `settings` - Application settings (Kindle email, SMTP config, etc.)
+- `_migrations` - Tracks applied database migrations
 
 ## Configuration
 
 Environment variables (see `backend/.env.example`):
 
 ```env
+# Server
 PORT=3001
 NODE_ENV=development
+LOG_LEVEL=info
 
 # Database
 DB_PATH=./data/bookmark-digest.db
+
+# Image Handling
+MAX_IMAGE_SIZE_MB=5
+IMAGE_QUALITY=85
+MAX_ARTICLE_SIZE_MB=10
 
 # Kindle/SMTP (optional)
 KINDLE_EMAIL=your_kindle_email@kindle.com
@@ -156,21 +219,58 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
+
+# CORS
+CORS_ORIGIN=http://localhost:5173
 ```
 
-## Next Steps
+## Development
 
-### Immediate (Ready to Implement)
-1. **Browser Extension** - Manifest V3 extension for capturing pages
-2. **Frontend UI** - React-based web interface
-3. **Testing** - Unit and integration tests
+### Backend
+```bash
+cd backend
+npm install
+npm run dev              # Start with nodemon for auto-reload
+npm start               # Production start
+npm run migrate         # Run database migrations manually
+npm run lint            # Run ESLint
+npm test                # Run Jest tests
+```
 
-### Future Enhancements
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev             # Start Vite dev server
+npm run build           # Build for production
+npm run preview         # Preview production build
+npm run lint            # Run ESLint
+npm test                # Run Vitest tests
+```
+
+## Known Issues
+
+### Tag Feature Removed
+The tag feature was previously implemented but has been removed due to bugs. All tag-related database tables, API endpoints, and frontend components have been deleted. Do not attempt to restore or reference tag functionality.
+
+### Recent Bug Fixes
+- **Image display** - Fixed missing leading slash in image paths
+- **CSS parsing errors** - Suppressed JSDOM errors with VirtualConsole
+- **Article typography** - Added Tailwind Typography plugin
+- **EPUB library** - Replaced buggy @storyteller-platform/epub with @lesjoursfr/html-to-epub
+- **EPUB spine** - Fixed broken spine structure causing Kindle rejection
+- **SMTP validation** - Fixed validation for optional fromEmail field
+- **UI notifications** - Modernized extension UI with in-page toast notifications
+
+## Future Enhancements
+
+Potential features for future development:
 - Full-text search
 - Newsletter generation
 - Import from Pocket/Instapaper
 - Mobile app (React Native)
 - AI-powered summarization
+- Tag system (re-implementation)
 
 ## Troubleshooting
 
@@ -221,13 +321,12 @@ npm run migrate
 
 ## Contributing
 
-This project follows the corrected implementation plan which addresses:
-- ✅ Replaced unmaintained `epub-gen` with `@storyteller-platform/epub`
-- ✅ Added API key authentication
-- ✅ Fixed browser extension architecture
-- ✅ Enhanced error handling
-- ✅ Database constraints and migrations
-- ✅ Comprehensive logging
+This project uses:
+- **@lesjoursfr/html-to-epub** - EPUB 3.3 compliant generation (validated with epubcheck)
+- **API key authentication** - All API endpoints require `X-API-Key` header
+- **Database migrations** - SQLite schema managed via `backend/migrations/*.sql`
+- **Comprehensive logging** - Winston-based structured logging
+- **JSDOM VirtualConsole** - Suppresses CSS parsing errors from malformed HTML
 
 ## License
 
