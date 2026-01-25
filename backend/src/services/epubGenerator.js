@@ -238,7 +238,6 @@ figcaption {
 pre {
   background: #f8f9fa;
   padding: 1em;
-  overflow-x: auto;
   border-radius: 6px;
   border: 1px solid #e9ecef;
   font-family: 'Courier New', Courier, monospace;
@@ -296,9 +295,6 @@ a {
   color: #0066cc;
   text-decoration: none;
 }
-a:hover {
-  text-decoration: underline;
-}
 .metadata {
   color: #666;
   font-size: 0.9em;
@@ -308,7 +304,7 @@ a:hover {
   page-break-after: avoid;
 }
 .original-url {
-  word-break: break-all;
+  word-wrap: break-word;
   font-size: 0.8em;
   color: #888;
 }`;
