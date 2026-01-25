@@ -100,9 +100,11 @@ export const validationRules = {
   // SMTP settings validation
   updateSmtpSettings: [
     body('kindleEmail')
+      .trim()
       .isEmail()
       .withMessage('Valid Kindle email required'),
     body('smtpHost')
+      .trim()
       .notEmpty()
       .withMessage('SMTP host is required')
       .isString()
@@ -117,6 +119,7 @@ export const validationRules = {
       .custom(value => value === 'true' || value === 'false' || value === true || value === false)
       .withMessage('SMTP secure must be true or false'),
     body('smtpUser')
+      .trim()
       .notEmpty()
       .withMessage('SMTP username is required')
       .isString()
@@ -130,7 +133,8 @@ export const validationRules = {
       .withMessage('SMTP password too long'),
     body('fromEmail')
       .optional()
-      .isEmail()
+      .trim()
+      .custom(value => !value || value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
       .withMessage('Valid from email required')
   ]
 };

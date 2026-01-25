@@ -76,7 +76,12 @@ export default function Settings() {
   });
 
   const handleSaveSmtpSettings = () => {
-    updateSettingsMutation.mutate(smtpSettings);
+    // Remove empty strings from optional fields
+    const cleanedSettings = { ...smtpSettings };
+    if (!cleanedSettings.fromEmail.trim()) {
+      delete cleanedSettings.fromEmail;
+    }
+    updateSettingsMutation.mutate(cleanedSettings);
   };
 
   const handleTestSmtp = () => {
