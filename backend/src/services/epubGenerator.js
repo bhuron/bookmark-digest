@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import fsSync from 'fs';
 import { fileURLToPath } from 'url';
+import AdmZip from 'adm-zip';
 
 import logger from '../utils/logger.js';
 import { getConfig } from '../config.js';
@@ -124,7 +125,10 @@ class EPUBGenerator {
        // Create and render EPUB
        const epub = new EPub(epubOptions, filepath);
        await epub.render();
-       
+
+       // Fix broken spine entries (library bug: generates content_0_item_0 but manifest has content_1_item_1)
+       await this._fixEpubSpine(filepath);
+
        logger.info('EPUB written to disk', { filepath });
 
        // Get file stats
@@ -450,6 +454,75 @@ a {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Fix broken spine entries in generated EPUB
+   * The @lesjoursfr/html-to-epub library has a bug where it generates spine entries
+   * with 0-based indexing (content_0_item_0) but manifest uses 1-based (content_1_item_1)
+   */
+  async _fixEpubSpine(epubPath) {
+    try {
+      const zip = new AdmZip(epubPath);
+      const opfEntry = zip.getEntry('OEBPS/content.opf');
+
+      if (!opfEntry) {
+        logger.warn('content.opf not found in EPUB, skipping spine fix');
+        return;
+      }
+
+      let opfContent = opfEntry.getData().toString('utf8');
+
+      // Extract manifest items to get valid IDs
+      const manifestItems = new Set();
+      const manifestMatch = opfContent.match(/<manifest>([\s\S]*?)<\/manifest>/i);
+      if (manifestMatch) {
+        const itemMatches = manifestMatch[1].match(/<item[^>]+id="([^"]+)"/gi);
+        if (itemMatches) {
+          itemMatches.forEach(match => {
+            const idMatch = match.match(/id="([^"]+)"/);
+            if (idMatch) {
+              manifestItems.add(idMatch[1]);
+            }
+          });
+        }
+      }
+
+      // Fix spine: remove itemref entries that don't exist in manifest
+      const originalSpine = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
+      if (originalSpine) {
+        let spineContent = originalSpine[1];
+        let removedCount = 0;
+
+        // Remove invalid itemref entries
+        spineContent = spineContent.replace(/<itemref[^>]+idref="([^"]+)"\s*\/>/gi, (match, idref) => {
+          if (!manifestItems.has(idref)) {
+            removedCount++;
+            logger.info('Removing invalid spine entry', { idref });
+            return ''; // Remove this itemref
+          }
+          return match; // Keep valid itemref
+        });
+
+        // Clean up extra whitespace
+        spineContent = spineContent.replace(/\n\s*\n\s*\n/g, '\n').trim();
+
+        // Replace the spine section
+        opfContent = opfContent.replace(
+          /<spine[^>]*>[\s\S]*?<\/spine>/i,
+          originalSpine[0].replace(/>([\s\S]*)</, () => `>${spineContent}<`)
+        );
+
+        if (removedCount > 0) {
+          zip.updateFile('OEBPS/content.opf', Buffer.from(opfContent, 'utf8'));
+          zip.writeZip(epubPath);
+          logger.info('Fixed EPUB spine', { removedCount, epubPath });
+        }
+      }
+    } catch (error) {
+      // Log but don't fail the entire process
+      logger.warn('Failed to fix EPUB spine', { error: error.message, epubPath });
     }
   }
 
