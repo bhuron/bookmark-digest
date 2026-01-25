@@ -88,14 +88,15 @@ class EPUBGenerator {
        for (let i = 0; i < articles.length; i++) {
          const article = articles[i];
          const chapterHtml = this._prepareArticleContent(article, i + 1);
-         
+
          content.push({
            title: article.title,
            data: chapterHtml,
-           author: article.author ? [article.author] : [],
+           // Don't set author here - library auto-renders it with no option to disable
+           // Author info is already in the HTML metadata from _prepareArticleContent
            filename: `chapter-${i + 1}`
          });
-         
+
          logger.debug('Chapter prepared', {
            chapter: i + 1,
            title: article.title
@@ -114,6 +115,8 @@ class EPUBGenerator {
          content,
          // Disable audio/video downloads
          downloadAudioVideoFiles: false,
+         // Don't auto-append chapter titles (we have custom formatting in content HTML)
+         appendChapterTitles: false,
          // Use generated cover or custom cover
          cover: coverPath || (options.cover && await this._fileExists(options.cover) ? options.cover : null)
        };
