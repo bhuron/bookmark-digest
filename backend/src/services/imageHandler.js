@@ -51,8 +51,8 @@ class ImageHandler {
       const img = images[i];
       const src = this._getImageSrc(img);
 
-      if (!src || src.startsWith('data:')) {
-        continue; // Skip data URIs and missing src
+      if (!src || src.startsWith('data:') || src.includes('this.src') || src.includes('javascript:')) {
+        continue; // Skip data URIs, JavaScript code, and missing src
       }
 
       try {
@@ -90,13 +90,32 @@ class ImageHandler {
 
   /**
    * Get image src from element, handling lazy loading
+   * Check data attributes first as they contain the real URLs in lazy-loading scenarios
    */
   _getImageSrc(img) {
-    return img.src ||
-           img.dataset?.src ||
+    return img.dataset?.src ||
            img.getAttribute('data-src') ||
            img.getAttribute('data-lazy-src') ||
-           img.getAttribute('data-original');
+           img.getAttribute('data-original') ||
+           img.src;
+  }
+
+  /**
+   * Get realistic browser headers for image requests
+   */
+  _getBrowserHeaders(imageUrl, baseUrl) {
+    const urlOrigin = new URL(imageUrl).origin;
+    const baseOrigin = new URL(baseUrl).origin;
+
+    return {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': baseUrl,
+      'Sec-Fetch-Dest': 'image',
+      'Sec-Fetch-Mode': 'no-cors',
+      'Sec-Fetch-Site': urlOrigin === baseOrigin ? 'same-origin' : 'cross-site'
+    };
   }
 
   /**
@@ -119,9 +138,7 @@ class ImageHandler {
     try {
       response = await fetch(imageUrl, {
         signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; BookmarkDigest/1.0; +https://github.com)'
-        }
+        headers: this._getBrowserHeaders(imageUrl, baseUrl)
       });
     } catch (error) {
       if (error.name === 'AbortError') {
