@@ -175,8 +175,7 @@ class KindleService {
   }
 }
 
-// Create singleton instance and load from environment
+// Create singleton instance (don't auto-load from env - let index.js handle it)
 const kindleService = new KindleService();
-kindleService.loadFromEnv();
 
 export default kindleService;

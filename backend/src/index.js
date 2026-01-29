@@ -105,21 +105,25 @@ try {
   process.exit(1);
 }
 
-// Try to load Kindle configuration from database if not configured from environment
-if (!kindleService.isConfigured()) {
-  try {
-    const smtpSettings = settingsService.getSmtpSettings();
-    if (settingsService.isSmtpConfigured()) {
-      kindleService.configure(smtpSettings);
-      logger.info('Kindle service configured from database settings');
-    } else {
+// Try to load Kindle configuration from database first, then fall back to environment
+try {
+  const smtpSettings = settingsService.getSmtpSettings();
+  if (settingsService.isSmtpConfigured()) {
+    kindleService.configure(smtpSettings);
+    logger.info('Kindle service configured from database settings');
+  } else {
+    // Database not configured, try loading from environment
+    const loadedFromEnv = kindleService.loadFromEnv();
+    if (!loadedFromEnv) {
       logger.info('Kindle service not configured - waiting for SMTP settings via API');
     }
-  } catch (error) {
-    logger.warn('Failed to load Kindle configuration from database', {
-      error: error.message
-    });
   }
+} catch (error) {
+  logger.warn('Failed to load Kindle configuration from database, trying environment', {
+    error: error.message
+  });
+  // Fall back to environment variables
+  kindleService.loadFromEnv();
 }
 
 // Start server
