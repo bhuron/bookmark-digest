@@ -33,7 +33,7 @@ npm test                 # Run Jest tests
 ### Frontend (in `/frontend` directory)
 ```bash
 npm install              # Install dependencies
-npm run dev              # Start Vite dev server (default: http://localhost:5173)
+npm run dev              # Start Vite dev server (default: http://localhost:5174)
 npm run build            # Build for production
 npm run preview          # Preview production build
 npm run lint             # Run ESLint
@@ -202,7 +202,7 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 
 # CORS
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5174
 ```
 
 ## Key Implementation Details

@@ -48,7 +48,10 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 ```bash
 cd backend
 npm install
-cp .env.example .env
+
+# Copy environment configuration (creates .env at project root)
+cp backend/.env.example .env
+
 npm start
 ```
 
@@ -62,10 +65,14 @@ The server will:
 ```bash
 cd frontend
 npm install
+
+# Optional: Copy environment configuration (for custom API base URL)
+cp .env.example .env.local
+
 npm run dev
 ```
 
-The web UI will be available at `http://localhost:5173`
+The web UI will be available at `http://localhost:5174`
 
 On first load, you'll need to enter the API key from `backend/config.json`.
 
@@ -221,7 +228,7 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 
 # CORS
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5174
 ```
 
 ## Development

@@ -877,7 +877,7 @@ SMTP_PASSWORD=your_app_password
 FROM_EMAIL=your_email@gmail.com
 
 # Security
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:5174
 API_RATE_LIMIT=100
 ```
 
@@ -1014,7 +1014,7 @@ app.use('/api/', apiLimiter);
 #### CORS Configuration
 ```javascript
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -1176,7 +1176,7 @@ npm run dev:frontend
 ```
 
 ### 3. First Use
-1. Navigate to `http://localhost:5173` for the web UI
+1. Navigate to `http://localhost:5174` for the web UI
 2. Click the extension icon on any article page to save it
 3. Use the web UI to browse, search, and tag articles
 4. Select articles and generate EPUB
