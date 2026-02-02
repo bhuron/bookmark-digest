@@ -7,15 +7,13 @@ import { formatDistanceToNow } from 'date-fns';
 export default function EPUB() {
   const [selectedArticles, setSelectedArticles] = useState(new Set());
   const [epubTitle, setEpubTitle] = useState('');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
   const queryClient = useQueryClient();
 
-  // Fetch articles with pagination
+  // Fetch all articles for EPUB selection (max 100, backend limit)
   const { data: articlesData, isLoading: articlesLoading } = useQuery({
-    queryKey: ['articles', 'epub', page, limit],
+    queryKey: ['articles', 'epub'],
     queryFn: async () => {
-      const response = await articlesApi.list({ page, limit });
+      const response = await articlesApi.list({ limit: 100 });
       return response.data;
     },
     enabled: !!localStorage.getItem('bookmark_digest_api_key'),
