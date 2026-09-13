@@ -46,6 +46,7 @@ class EPUBGenerator {
       FROM articles
       WHERE id IN (${placeholders})
         AND capture_success = 1
+        AND deleted_at IS NULL
       ORDER BY published_at ASC, created_at ASC
     `).all(...articleIds);
 

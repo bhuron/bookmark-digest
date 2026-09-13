@@ -23,6 +23,44 @@ export function validateRequest(req, res, next) {
 }
 
 /**
+ * Target selection shared by the bulk endpoints: either explicit `ids` or a
+ * `filter`. Exactly one of the two is required - the routes enforce that, these
+ * rules only police the shape.
+ */
+const articleScopeRules = [
+  body('ids')
+    .optional()
+    .isArray({ min: 1, max: 500 })
+    .withMessage('ids must be an array containing 1 to 500 article IDs'),
+  body('ids.*')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Each article ID must be a positive integer'),
+  body('filter')
+    .optional()
+    .isObject()
+    .withMessage('filter must be an object'),
+  body('filter.search')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Search query too long'),
+  body('filter.is_archived')
+    .optional()
+    .isBoolean()
+    .withMessage('filter.is_archived must be a boolean'),
+  body('filter.is_favorite')
+    .optional()
+    .isBoolean()
+    .withMessage('filter.is_favorite must be a boolean'),
+  body('filter.trashed')
+    .optional()
+    .isBoolean()
+    .withMessage('filter.trashed must be a boolean')
+];
+
+/**
  * Common validation rules
  */
 export const validationRules = {
@@ -70,7 +108,12 @@ export const validationRules = {
       .isString()
       .trim()
       .isLength({ min: 1, max: 200 })
-      .withMessage('Search query too long')
+      .withMessage('Search query too long'),
+
+    query('trashed')
+      .optional()
+      .isIn(['true', 'false'])
+      .withMessage('trashed must be true or false')
   ],
 
   // EPUB generation
@@ -99,14 +142,23 @@ export const validationRules = {
       .withMessage('Author must be 1-100 characters')
   ],
 
-  // Bulk article deletion
-  bulkDeleteArticles: [
-    body('ids')
-      .isArray({ min: 1, max: 500 })
-      .withMessage('ids must be an array containing 1 to 500 article IDs'),
-    body('ids.*')
-      .isInt({ min: 1 })
-      .withMessage('Each article ID must be a positive integer')
+  // Bulk operations. Targets are either explicit ids or a filter.
+  bulkDeleteArticles: [...articleScopeRules],
+
+  restoreArticles: [...articleScopeRules],
+
+  purgeArticles: [...articleScopeRules],
+
+  bulkUpdateArticles: [
+    ...articleScopeRules,
+    body('is_archived')
+      .optional()
+      .isBoolean()
+      .withMessage('is_archived must be a boolean'),
+    body('is_favorite')
+      .optional()
+      .isBoolean()
+      .withMessage('is_favorite must be a boolean')
   ],
 
   // SMTP settings validation

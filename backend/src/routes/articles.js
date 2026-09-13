@@ -9,6 +9,36 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 
 /**
+ * Read the target selection from a bulk request body.
+ *
+ * Callers supply either explicit `ids` or a `filter` that selects the whole
+ * matching set server-side, which is what makes "select all matching" work
+ * across pages without shipping thousands of ids.
+ *
+ * @param {Object} req - Express request
+ * @returns {{scope?: Object, error?: string}}
+ */
+function readScope(req) {
+  const { ids, filter } = req.body || {};
+  const hasIds = Array.isArray(ids) && ids.length > 0;
+
+  if (hasIds && filter) {
+    return { error: 'Provide either ids or filter, not both' };
+  }
+
+  if (!hasIds && !filter) {
+    return { error: 'Provide ids or filter' };
+  }
+
+  return {
+    scope: {
+      ids: hasIds ? [...new Set(ids.map(Number))] : undefined,
+      filter: filter || undefined
+    }
+  };
+}
+
+/**
  * POST /api/articles
  * Create a new article from HTML
  */
@@ -56,6 +86,32 @@ router.post('/',
 );
 
 /**
+ * POST /api/articles/restore
+ * Move trashed articles back into the library
+ */
+router.post('/restore',
+  validationRules.restoreArticles,
+  validateRequest,
+  asyncHandler(async (req, res) => {
+    const { scope, error } = readScope(req);
+
+    if (error) {
+      return res.status(400).json({ error: 'Bad Request', message: error });
+    }
+
+    const { restored } = articleService.restoreArticles(scope);
+
+    logger.info('Articles restored', { restored });
+
+    res.json({
+      success: true,
+      restored,
+      message: `${restored} article${restored === 1 ? '' : 's'} restored`
+    });
+  })
+);
+
+/**
  * GET /api/articles
  * List articles with pagination and filters
  */
@@ -69,22 +125,25 @@ router.get('/',
       search,
       is_archived,
       is_favorite,
-      sort_by = 'created_at'
+      sort_by = 'created_at',
+      trashed
     } = req.query;
 
-    const { articles, total } = articleService.listArticles({
+    const { articles, total, trashedTotal } = articleService.listArticles({
       page: Number(page),
       limit: Number(limit),
       search,
       is_archived,
       is_favorite,
-      sort_by
+      sort_by,
+      trashed: trashed === 'true'
     });
 
     res.json({
       data: {
         articles,
-        total
+        total,
+        trashedTotal
       }
     });
   })
@@ -97,6 +156,98 @@ router.get('/',
 router.get('/stats',
   asyncHandler(async (req, res) => {
     res.json(articleService.getStats());
+  })
+);
+
+/**
+ * PUT /api/articles/bulk
+ * Apply archive/favourite flags to many articles
+ * Must be registered before PUT /:id so "bulk" is not matched as an ID
+ */
+router.put('/bulk',
+  validationRules.bulkUpdateArticles,
+  validateRequest,
+  asyncHandler(async (req, res) => {
+    const { is_archived, is_favorite } = req.body;
+
+    if (is_archived === undefined && is_favorite === undefined) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Provide is_archived or is_favorite'
+      });
+    }
+
+    const { scope, error } = readScope(req);
+
+    if (error) {
+      return res.status(400).json({ error: 'Bad Request', message: error });
+    }
+
+    const { updated } = articleService.bulkUpdateArticles(scope, { is_archived, is_favorite });
+
+    logger.info('Articles bulk updated', { updated, is_archived, is_favorite });
+
+    res.json({
+      success: true,
+      updated,
+      message: `${updated} article${updated === 1 ? '' : 's'} updated`
+    });
+  })
+);
+
+/**
+ * DELETE /api/articles/bulk
+ * Move many articles to the trash
+ * Must be registered before DELETE /:id so "bulk" is not matched as an ID
+ */
+router.delete('/bulk',
+  validationRules.bulkDeleteArticles,
+  validateRequest,
+  asyncHandler(async (req, res) => {
+    const { scope, error } = readScope(req);
+
+    if (error) {
+      return res.status(400).json({ error: 'Bad Request', message: error });
+    }
+
+    const { deleted, requested, notFound } = articleService.softDeleteArticles(scope);
+
+    logger.info('Articles moved to trash', { requested, deleted, notFound });
+
+    res.json({
+      success: true,
+      requested,
+      deleted,
+      notFound,
+      message: `${deleted} article${deleted === 1 ? '' : 's'} moved to trash`
+    });
+  })
+);
+
+/**
+ * DELETE /api/articles/purge
+ * Permanently delete trashed articles and their images
+ */
+router.delete('/purge',
+  validationRules.purgeArticles,
+  validateRequest,
+  asyncHandler(async (req, res) => {
+    const { scope, error } = readScope(req);
+
+    if (error) {
+      return res.status(400).json({ error: 'Bad Request', message: error });
+    }
+
+    const { purged, imagesRemoved } = await articleService.purgeArticles(scope);
+
+    logger.info('Articles purged', { purged, imagesRemoved });
+
+    res.json({
+      success: true,
+      purged,
+      imagesRemoved,
+      message: `${purged} article${purged === 1 ? '' : 's'} permanently deleted`
+    });
   })
 );
 
@@ -162,41 +313,8 @@ router.put('/:id',
 );
 
 /**
- * DELETE /api/articles/bulk
- * Delete multiple articles in a single transaction
- * Must be registered before DELETE /:id so "bulk" is not matched as an ID
- */
-router.delete('/bulk',
-  validationRules.bulkDeleteArticles,
-  validateRequest,
-  asyncHandler(async (req, res) => {
-    // Deduplicate so the reported counts stay accurate
-    const ids = [...new Set(req.body.ids.map(Number))];
-
-    const { deleted, imagesRemoved } = await articleService.deleteArticlesByIds(ids);
-    const notFound = ids.length - deleted;
-
-    logger.info('Articles bulk deleted', {
-      requested: ids.length,
-      deleted,
-      notFound,
-      imagesRemoved
-    });
-
-    res.json({
-      success: true,
-      requested: ids.length,
-      deleted,
-      notFound,
-      imagesRemoved,
-      message: `${deleted} article${deleted === 1 ? '' : 's'} deleted`
-    });
-  })
-);
-
-/**
  * DELETE /api/articles/:id
- * Delete article
+ * Move an article to the trash
  */
 router.delete('/:id',
   validationRules.articleId,
@@ -204,7 +322,7 @@ router.delete('/:id',
   asyncHandler(async (req, res) => {
     const articleId = Number(req.params.id);
 
-    const { deleted, imagesRemoved } = await articleService.deleteArticlesByIds([articleId]);
+    const { deleted } = articleService.softDeleteArticles({ ids: [articleId] });
 
     if (deleted === 0) {
       return res.status(404).json({
@@ -213,11 +331,11 @@ router.delete('/:id',
       });
     }
 
-    logger.info('Article deleted', { articleId, imagesRemoved });
+    logger.info('Article moved to trash', { articleId });
 
     res.json({
       success: true,
-      message: 'Article deleted successfully'
+      message: 'Article moved to trash'
     });
   })
 );

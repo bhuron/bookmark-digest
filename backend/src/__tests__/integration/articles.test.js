@@ -395,7 +395,7 @@ describe('Articles API Integration Tests', () => {
       expect(getResponse.status).toBe(404);
     });
 
-    it('should remove the article image files from disk', async () => {
+    it('should keep image files when trashing and remove them only on purge', async () => {
       const { getConnection } = await import('../../database/index.js');
       const db = getConnection();
 
@@ -411,11 +411,22 @@ describe('Articles API Integration Tests', () => {
           'INSERT INTO article_images (article_id, original_url, local_path) VALUES (?, ?, ?)'
         ).run(articleId, 'https://example.com/a.jpg', `/images/${dirName}/image-0.jpg`);
 
-        const response = await request(app)
+        // Trashing is reversible, so the file has to survive it
+        const trashResponse = await request(app)
           .delete(`/api/articles/${articleId}`)
           .set(createAuthHeaders());
 
-        expect(response.status).toBe(200);
+        expect(trashResponse.status).toBe(200);
+        await expect(fs.access(file)).resolves.toBeUndefined();
+
+        // Purging is permanent, so that is where the file goes
+        const purgeResponse = await request(app)
+          .delete('/api/articles/purge')
+          .set(createAuthHeaders())
+          .send({ ids: [articleId] });
+
+        expect(purgeResponse.status).toBe(200);
+        expect(purgeResponse.body).toHaveProperty('imagesRemoved', 1);
         await expect(fs.access(file)).rejects.toThrow();
       } finally {
         await fs.rm(dir, { recursive: true, force: true });
@@ -592,6 +603,297 @@ describe('Articles API Integration Tests', () => {
       expect(typeof response.body.archived_articles).toBe('number');
       expect(typeof response.body.favorite_articles).toBe('number');
       expect(typeof response.body.unread_articles).toBe('number');
+    });
+  });
+
+  describe('Soft delete and bulk operations', () => {
+    const seed = async (count, prefix) => {
+      const ids = [];
+
+      for (let n = 1; n <= count; n += 1) {
+        const response = await request(app)
+          .post('/api/articles')
+          .set(createAuthHeaders())
+          .send({
+            html: `<html><head><title>${prefix} ${n}</title></head><body><article><h1>${prefix} ${n}</h1><p>Body text for the ${prefix} article number ${n}, long enough for extraction.</p></article></body></html>`,
+            url: `https://example.com/${prefix}-${n}`
+          });
+
+        ids.push(response.body.article.id);
+      }
+
+      return ids;
+    };
+
+    describe('trash, restore and purge', () => {
+      it('should hide a trashed article from the library and from GET', async () => {
+        const [id] = await seed(1, 'trash');
+
+        const trash = await request(app)
+          .delete(`/api/articles/${id}`)
+          .set(createAuthHeaders());
+
+        expect(trash.status).toBe(200);
+        expect(trash.body).toHaveProperty('success', true);
+
+        const list = await request(app).get('/api/articles').set(createAuthHeaders());
+        expect(list.body.data.total).toBe(0);
+
+        const single = await request(app).get(`/api/articles/${id}`).set(createAuthHeaders());
+        expect(single.status).toBe(404);
+      });
+
+      it('should list trashed articles when trashed=true', async () => {
+        const [id] = await seed(1, 'trashlist');
+        await request(app).delete(`/api/articles/${id}`).set(createAuthHeaders());
+
+        const trashed = await request(app)
+          .get('/api/articles?trashed=true')
+          .set(createAuthHeaders());
+
+        expect(trashed.status).toBe(200);
+        expect(trashed.body.data.total).toBe(1);
+        expect(trashed.body.data.articles[0]).toMatchObject({ id, is_trashed: true });
+      });
+
+      it('should report the trash size alongside the library listing', async () => {
+        const ids = await seed(2, 'trashcount');
+        await request(app).delete(`/api/articles/${ids[0]}`).set(createAuthHeaders());
+
+        const list = await request(app).get('/api/articles').set(createAuthHeaders());
+
+        expect(list.body.data.total).toBe(1);
+        expect(list.body.data.trashedTotal).toBe(1);
+      });
+
+      it('should restore a trashed article', async () => {
+        const [id] = await seed(1, 'restore');
+        await request(app).delete(`/api/articles/${id}`).set(createAuthHeaders());
+
+        const restore = await request(app)
+          .post('/api/articles/restore')
+          .set(createAuthHeaders())
+          .send({ ids: [id] });
+
+        expect(restore.status).toBe(200);
+        expect(restore.body).toHaveProperty('restored', 1);
+
+        const single = await request(app).get(`/api/articles/${id}`).set(createAuthHeaders());
+        expect(single.status).toBe(200);
+        expect(single.body.article.is_trashed).toBe(false);
+      });
+
+      it('should not restore an article that is not trashed', async () => {
+        const [id] = await seed(1, 'restorelive');
+
+        const restore = await request(app)
+          .post('/api/articles/restore')
+          .set(createAuthHeaders())
+          .send({ ids: [id] });
+
+        expect(restore.body).toHaveProperty('restored', 0);
+      });
+
+      it('should refuse to update a trashed article', async () => {
+        const [id] = await seed(1, 'trashupdate');
+        await request(app).delete(`/api/articles/${id}`).set(createAuthHeaders());
+
+        const update = await request(app)
+          .put(`/api/articles/${id}`)
+          .set(createAuthHeaders())
+          .send({ title: 'Should not apply' });
+
+        expect(update.status).toBe(404);
+      });
+
+      it('should count trashed articles in stats separately from the library', async () => {
+        const ids = await seed(2, 'trashstats');
+        await request(app).delete(`/api/articles/${ids[0]}`).set(createAuthHeaders());
+
+        const stats = await request(app).get('/api/articles/stats').set(createAuthHeaders());
+
+        expect(stats.body.total_articles).toBe(1);
+        expect(stats.body.trashed_articles).toBe(1);
+      });
+
+      it('should only purge articles that are already trashed', async () => {
+        const ids = await seed(2, 'purge');
+        await request(app).delete(`/api/articles/${ids[0]}`).set(createAuthHeaders());
+
+        // A live article must survive a purge request
+        const livePurge = await request(app)
+          .delete('/api/articles/purge')
+          .set(createAuthHeaders())
+          .send({ ids: [ids[1]] });
+
+        expect(livePurge.body).toHaveProperty('purged', 0);
+
+        const afterLive = await request(app).get('/api/articles').set(createAuthHeaders());
+        expect(afterLive.body.data.total).toBe(1);
+
+        // The trashed one goes for good
+        const purge = await request(app)
+          .delete('/api/articles/purge')
+          .set(createAuthHeaders())
+          .send({ ids: [ids[0]] });
+
+        expect(purge.body).toHaveProperty('purged', 1);
+
+        const trashed = await request(app)
+          .get('/api/articles?trashed=true')
+          .set(createAuthHeaders());
+        expect(trashed.body.data.total).toBe(0);
+      });
+
+      it('should revive a trashed article when the same URL is captured again', async () => {
+        const [id] = await seed(1, 'revive');
+        await request(app).delete(`/api/articles/${id}`).set(createAuthHeaders());
+
+        const recapture = await request(app)
+          .post('/api/articles')
+          .set(createAuthHeaders())
+          .send({
+            html: '<html><head><title>revive 1</title></head><body><article><h1>revive 1</h1><p>Body text for the recaptured article, long enough for extraction to succeed.</p></article></body></html>',
+            url: 'https://example.com/revive-1'
+          });
+
+        expect(recapture.status).toBe(201);
+        expect(recapture.body.article.id).toBe(id);
+
+        const single = await request(app).get(`/api/articles/${id}`).set(createAuthHeaders());
+        expect(single.status).toBe(200);
+        expect(single.body.article.is_trashed).toBe(false);
+      });
+
+      it('should require ids or filter', async () => {
+        const response = await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({});
+
+        expect(response.status).toBe(400);
+      });
+
+      it('should reject supplying both ids and filter', async () => {
+        const [id] = await seed(1, 'both');
+
+        const response = await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ ids: [id], filter: { search: 'both' } });
+
+        expect(response.status).toBe(400);
+      });
+    });
+
+    describe('bulk operations by filter (cross-page selection)', () => {
+      it('should archive every article matching a filter, ignoring pagination', async () => {
+        await seed(3, 'archive');
+
+        const response = await request(app)
+          .put('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: {}, is_archived: true });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('updated', 3);
+
+        const archived = await request(app)
+          .get('/api/articles?is_archived=true')
+          .set(createAuthHeaders());
+        expect(archived.body.data.total).toBe(3);
+      });
+
+      it('should scope a filter to the current search', async () => {
+        await seed(2, 'keep');
+        await seed(1, 'needle');
+
+        const response = await request(app)
+          .put('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: { search: 'needle' }, is_favorite: true });
+
+        expect(response.body).toHaveProperty('updated', 1);
+
+        const favorites = await request(app)
+          .get('/api/articles?is_favorite=true')
+          .set(createAuthHeaders());
+        expect(favorites.body.data.total).toBe(1);
+      });
+
+      it('should require a field to update', async () => {
+        await seed(1, 'nofields');
+
+        const response = await request(app)
+          .put('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: {} });
+
+        expect(response.status).toBe(400);
+      });
+
+      it('should trash every article matching a filter', async () => {
+        await seed(3, 'bulkdel');
+
+        const response = await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: {} });
+
+        expect(response.body).toHaveProperty('deleted', 3);
+
+        const list = await request(app).get('/api/articles').set(createAuthHeaders());
+        expect(list.body.data.total).toBe(0);
+
+        const trashed = await request(app)
+          .get('/api/articles?trashed=true')
+          .set(createAuthHeaders());
+        expect(trashed.body.data.total).toBe(3);
+      });
+
+      it('should restore every article matching a filter', async () => {
+        await seed(2, 'restoreall');
+        await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: {} });
+
+        const response = await request(app)
+          .post('/api/articles/restore')
+          .set(createAuthHeaders())
+          .send({ filter: {} });
+
+        expect(response.body).toHaveProperty('restored', 2);
+      });
+
+      it('should empty the trash with a trashed filter', async () => {
+        await seed(2, 'empty');
+        await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: {} });
+
+        const response = await request(app)
+          .delete('/api/articles/purge')
+          .set(createAuthHeaders())
+          .send({ filter: { trashed: true } });
+
+        expect(response.body).toHaveProperty('purged', 2);
+
+        const trashed = await request(app)
+          .get('/api/articles?trashed=true')
+          .set(createAuthHeaders());
+        expect(trashed.body.data.total).toBe(0);
+      });
+
+      it('should reject a filter with an invalid field type', async () => {
+        const response = await request(app)
+          .delete('/api/articles/bulk')
+          .set(createAuthHeaders())
+          .send({ filter: { is_archived: 'yes' } });
+
+        expect(response.status).toBe(400);
+      });
     });
   });
 });

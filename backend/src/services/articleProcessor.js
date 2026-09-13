@@ -160,6 +160,8 @@ class ArticleProcessor {
             has_images = excluded.has_images,
             image_count = excluded.image_count,
             capture_success = 1,
+            -- Re-capturing a URL that is in the trash brings it back
+            deleted_at = NULL,
             updated_at = CURRENT_TIMESTAMP
           RETURNING id
         `);

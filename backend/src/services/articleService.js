@@ -7,24 +7,109 @@ import logger from '../utils/logger.js';
  * ever used to look a clause up here, never interpolated into SQL.
  */
 const SORT_CLAUSES = {
-  created_at: 'a.created_at DESC',
-  created_at_asc: 'a.created_at ASC',
-  title: 'a.title ASC',
-  title_desc: 'a.title DESC',
-  reading_time: 'a.reading_time_minutes ASC'
+  created_at: 'created_at DESC',
+  created_at_asc: 'created_at ASC',
+  title: 'title ASC',
+  title_desc: 'title DESC',
+  reading_time: 'reading_time_minutes ASC'
 };
 
 const DEFAULT_SORT = 'created_at';
 
 /**
- * Add the boolean flags the API exposes, since SQLite stores them as integers
+ * True for the string and boolean spellings of true.
+ * Filters arrive as JSON booleans from the API and as strings from the query.
+ */
+function isTrue(value) {
+  return value === true || value === 'true';
+}
+
+/**
+ * Build a WHERE clause from a filter object.
+ *
+ * Deliberately refers to unqualified column names so the same clause can be
+ * reused by SELECT, UPDATE and DELETE. `trashed` is the only required choice:
+ * every caller either lists the library or the trash, never both.
+ *
+ * @param {Object} [filter]
+ * @param {string} [filter.search] - Substring match on title, text or excerpt
+ * @param {*} [filter.is_archived] - Restrict to archived/unarchived
+ * @param {*} [filter.is_favorite] - Restrict to favourites
+ * @param {boolean} [filter.trashed] - True selects trashed rows, otherwise live
+ * @returns {{whereClause: string, params: Array}}
+ */
+function filterScope({ search, is_archived, is_favorite, trashed } = {}) {
+  const conditions = ['capture_success = 1'];
+  const params = [];
+
+  conditions.push(isTrue(trashed) ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL');
+
+  if (search) {
+    conditions.push('(title LIKE ? OR content_text LIKE ? OR excerpt LIKE ?)');
+    const term = `%${search}%`;
+    params.push(term, term, term);
+  }
+
+  if (is_archived !== undefined) {
+    conditions.push('is_archived = ?');
+    params.push(isTrue(is_archived) ? 1 : 0);
+  }
+
+  if (is_favorite !== undefined) {
+    conditions.push('is_favorite = ?');
+    params.push(isTrue(is_favorite) ? 1 : 0);
+  }
+
+  return { whereClause: conditions.join(' AND '), params };
+}
+
+/**
+ * Build a WHERE clause restricting to explicit article ids.
+ *
+ * @param {number[]} ids - Article ids
+ * @param {boolean} live - True requires live rows, false requires trashed rows,
+ *   undefined accepts either
+ * @returns {{whereClause: string, params: Array}}
+ */
+function idScope(ids, live) {
+  const placeholders = ids.map(() => '?').join(', ');
+  const conditions = [`id IN (${placeholders})`];
+
+  if (live === true) {
+    conditions.push('deleted_at IS NULL');
+  } else if (live === false) {
+    conditions.push('deleted_at IS NOT NULL');
+  }
+
+  return { whereClause: conditions.join(' AND '), params: [...ids] };
+}
+
+/**
+ * Resolve a request scope from either explicit ids or a filter.
+ *
+ * @param {Object} scope
+ * @param {number[]} [scope.ids] - Explicit ids, already deduplicated
+ * @param {Object} [scope.filter] - Filter object, see filterScope
+ * @param {boolean} live - Row state the operation applies to
+ */
+function resolveScope({ ids, filter }, live) {
+  if (Array.isArray(ids) && ids.length > 0) {
+    return idScope(ids, live);
+  }
+
+  return filterScope({ ...filter, trashed: live === false });
+}
+
+/**
+ * Add the flags the API exposes, since SQLite stores them as integers
  */
 function withMetadata(article) {
   return {
     ...article,
     has_images: Boolean(article.has_images),
     is_archived: Boolean(article.is_archived),
-    is_favorite: Boolean(article.is_favorite)
+    is_favorite: Boolean(article.is_favorite),
+    is_trashed: Boolean(article.deleted_at)
   };
 }
 
@@ -36,16 +121,13 @@ function withMetadata(article) {
  */
 class ArticleService {
   /**
-   * List captured articles with pagination and filters.
+   * List articles with pagination and filters.
    *
-   * @param {Object} options
-   * @param {number} [options.page=1] - 1-based page number
-   * @param {number} [options.limit=20] - Page size
-   * @param {string} [options.search] - Substring match on title, text or excerpt
-   * @param {string} [options.is_archived] - 'true'/'false' filter
-   * @param {string} [options.is_favorite] - 'true'/'false' filter
-   * @param {string} [options.sort_by='created_at'] - One of SORT_CLAUSES
-   * @returns {{articles: Array, total: number}}
+   * Trashed articles are excluded unless `trashed` is set, and callers of the
+   * trash view get a hint about how many are waiting there.
+   *
+   * @param {Object} options - See filterScope, plus page/limit/sort_by/trashed
+   * @returns {{articles: Array, total: number, trashedTotal: number}}
    */
   listArticles({
     page = 1,
@@ -53,36 +135,18 @@ class ArticleService {
     search,
     is_archived,
     is_favorite,
-    sort_by = DEFAULT_SORT
+    sort_by = DEFAULT_SORT,
+    trashed = false
   } = {}) {
     const db = getConnection();
 
-    const conditions = ['a.capture_success = 1'];
-    const params = [];
-
-    if (search) {
-      conditions.push('(a.title LIKE ? OR a.content_text LIKE ? OR a.excerpt LIKE ?)');
-      const term = `%${search}%`;
-      params.push(term, term, term);
-    }
-
-    if (is_archived !== undefined) {
-      conditions.push('a.is_archived = ?');
-      params.push(is_archived === 'true' ? 1 : 0);
-    }
-
-    if (is_favorite !== undefined) {
-      conditions.push('a.is_favorite = ?');
-      params.push(is_favorite === 'true' ? 1 : 0);
-    }
-
-    const whereClause = conditions.join(' AND ');
+    const { whereClause, params } = filterScope({ search, is_archived, is_favorite, trashed });
     const orderBy = SORT_CLAUSES[sort_by] || SORT_CLAUSES[DEFAULT_SORT];
     const offset = (page - 1) * limit;
 
     const articles = db.prepare(`
-      SELECT a.*
-      FROM articles a
+      SELECT *
+      FROM articles
       WHERE ${whereClause}
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
@@ -90,28 +154,37 @@ class ArticleService {
 
     const { total } = db.prepare(`
       SELECT COUNT(*) as total
-      FROM articles a
+      FROM articles
       WHERE ${whereClause}
     `).get(...params);
 
-    return { articles: articles.map(withMetadata), total };
+    // Surfaced so the UI can offer "empty trash" without a second request
+    const { trashedTotal } = db.prepare(`
+      SELECT COUNT(*) as trashedTotal
+      FROM articles
+      WHERE capture_success = 1 AND deleted_at IS NOT NULL
+    `).get();
+
+    return { articles: articles.map(withMetadata), total, trashedTotal };
   }
 
   /**
-   * Get a single article by id.
+   * Get a single live article by id. Trashed articles are not found.
    *
    * @param {number|string} id - Article id
    * @returns {Object|null} - Article, or null when it does not exist
    */
   getArticleById(id) {
     const db = getConnection();
-    const article = db.prepare('SELECT a.* FROM articles a WHERE a.id = ?').get(id);
+    const article = db
+      .prepare('SELECT * FROM articles WHERE id = ? AND deleted_at IS NULL')
+      .get(id);
 
     return article ? withMetadata(article) : null;
   }
 
   /**
-   * Update the editable fields of an article.
+   * Update the editable fields of a live article.
    *
    * @param {number|string} id - Article id
    * @param {Object} fields - Any of title, is_archived, is_favorite
@@ -121,27 +194,15 @@ class ArticleService {
   updateArticle(id, { title, is_archived, is_favorite } = {}) {
     const db = getConnection();
 
-    const existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(id);
+    const existing = db
+      .prepare('SELECT id FROM articles WHERE id = ? AND deleted_at IS NULL')
+      .get(id);
 
     if (!existing) {
       return { found: false, updated: false };
     }
 
-    const assignments = [];
-    const params = [];
-
-    if (title !== undefined) {
-      assignments.push('title = ?');
-      params.push(title);
-    }
-    if (is_archived !== undefined) {
-      assignments.push('is_archived = ?');
-      params.push(is_archived ? 1 : 0);
-    }
-    if (is_favorite !== undefined) {
-      assignments.push('is_favorite = ?');
-      params.push(is_favorite ? 1 : 0);
-    }
+    const { assignments, params } = buildFieldAssignments({ title, is_archived, is_favorite });
 
     if (assignments.length === 0) {
       return { found: true, updated: false };
@@ -156,7 +217,126 @@ class ArticleService {
   }
 
   /**
-   * Aggregated statistics across successfully captured articles.
+   * Apply archive/favourite flags to many articles at once.
+   *
+   * @param {{ids?: number[], filter?: Object}} scope - Targets to update
+   * @param {Object} fields - Any of is_archived, is_favorite
+   * @returns {{updated: number}} - Rows changed
+   */
+  bulkUpdateArticles(scope, { is_archived, is_favorite } = {}) {
+    const db = getConnection();
+    const { assignments, params } = buildFieldAssignments({ is_archived, is_favorite });
+
+    if (assignments.length === 0) {
+      return { updated: 0 };
+    }
+
+    const { whereClause, params: scopeParams } = resolveScope(scope, true);
+    const result = db
+      .prepare(`UPDATE articles SET ${assignments.join(', ')} WHERE ${whereClause}`)
+      .run(...params, ...scopeParams);
+
+    logger.debug('Articles bulk updated', {
+      fields: assignments.join(', '),
+      updated: result.changes
+    });
+
+    return { updated: result.changes };
+  }
+
+  /**
+   * Move articles to the trash.
+   *
+   * Rows and image files are left in place so the delete can be undone; purging
+   * is what actually removes them.
+   *
+   * @param {{ids?: number[], filter?: Object}} scope - Targets to trash
+   * @returns {{deleted: number, requested: number, notFound: number}}
+   */
+  softDeleteArticles(scope) {
+    const db = getConnection();
+    const { whereClause, params } = resolveScope(scope, true);
+
+    const result = db
+      .prepare('UPDATE articles SET deleted_at = CURRENT_TIMESTAMP WHERE ' + whereClause)
+      .run(...params);
+
+    const requested = Array.isArray(scope.ids) && scope.ids.length > 0
+      ? scope.ids.length
+      : result.changes;
+
+    logger.info('Articles moved to trash', { deleted: result.changes, requested });
+
+    return {
+      deleted: result.changes,
+      requested,
+      notFound: requested - result.changes
+    };
+  }
+
+  /**
+   * Restore articles out of the trash.
+   *
+   * @param {{ids?: number[], filter?: Object}} scope - Targets to restore
+   * @returns {{restored: number}} - Rows changed
+   */
+  restoreArticles(scope) {
+    const db = getConnection();
+    const { whereClause, params } = resolveScope(scope, false);
+
+    const result = db
+      .prepare('UPDATE articles SET deleted_at = NULL WHERE ' + whereClause)
+      .run(...params);
+
+    logger.info('Articles restored from trash', { restored: result.changes });
+
+    return { restored: result.changes };
+  }
+
+  /**
+   * Permanently delete trashed articles and their image files.
+   *
+   * Only trashed rows can be purged, so a hard delete always goes through the
+   * trash first. Rows are removed in one transaction; `article_images` rows
+   * follow through ON DELETE CASCADE, so the stored paths are collected first.
+   * File cleanup is best-effort: the rows are already gone by then and a failed
+   * unlink must not fail the request.
+   *
+   * @param {{ids?: number[], filter?: Object}} scope - Targets to purge
+   * @returns {Promise<{purged: number, imagesRemoved: number}>}
+   */
+  async purgeArticles(scope) {
+    const db = getConnection();
+    const { whereClause, params } = resolveScope(scope, false);
+
+    const targets = db.prepare(`SELECT id FROM articles WHERE ${whereClause}`).all(...params);
+
+    if (targets.length === 0) {
+      return { purged: 0, imagesRemoved: 0 };
+    }
+
+    const ids = targets.map(row => row.id);
+    const placeholders = ids.map(() => '?').join(', ');
+
+    const imagePaths = db
+      .prepare(`SELECT local_path FROM article_images WHERE article_id IN (${placeholders})`)
+      .all(...ids)
+      .map(row => row.local_path);
+
+    const purge = db.transaction(() => db
+      .prepare(`DELETE FROM articles WHERE id IN (${placeholders})`)
+      .run(...ids).changes);
+
+    const purged = purge();
+    const imagesRemoved = await imageHandler.deleteImageFiles(imagePaths);
+
+    logger.info('Articles purged', { purged, imagesRemoved });
+
+    return { purged, imagesRemoved };
+  }
+
+  /**
+   * Aggregated statistics across live, successfully captured articles.
    *
    * @returns {Object} - Counts and totals, zeroed where SQL returns null
    */
@@ -173,7 +353,13 @@ class ArticleService {
         SUM(word_count) as total_words,
         SUM(reading_time_minutes) as total_reading_time
       FROM articles
-      WHERE capture_success = 1
+      WHERE capture_success = 1 AND deleted_at IS NULL
+    `).get();
+
+    const { trashed } = db.prepare(`
+      SELECT COUNT(*) as trashed
+      FROM articles
+      WHERE capture_success = 1 AND deleted_at IS NOT NULL
     `).get();
 
     return {
@@ -183,41 +369,36 @@ class ArticleService {
       unread_articles: stats.unread_articles || 0,
       articles_with_images: stats.articles_with_images || 0,
       total_words: stats.total_words || 0,
-      total_reading_time: stats.total_reading_time || 0
+      total_reading_time: stats.total_reading_time || 0,
+      trashed_articles: trashed || 0
     };
   }
+}
 
-  /**
-   * Delete articles and remove their image files from disk.
-   *
-   * Rows are removed in one transaction, so the batch all lands or none of it
-   * does. `article_images` rows go with them through ON DELETE CASCADE, so the
-   * stored paths are collected first. File cleanup is best-effort: the rows are
-   * already gone by then and a failed unlink must not fail the request.
-   *
-   * @param {number[]} ids - Article ids to delete
-   * @returns {Promise<{deleted: number, imagesRemoved: number, imageCount: number}>}
-   */
-  async deleteArticlesByIds(ids) {
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return { deleted: 0, imagesRemoved: 0, imageCount: 0 };
-    }
+/**
+ * Build SET assignments for the editable article columns.
+ *
+ * @param {Object} fields - Any of title, is_archived, is_favorite
+ * @returns {{assignments: string[], params: Array}}
+ */
+function buildFieldAssignments({ title, is_archived, is_favorite } = {}) {
+  const assignments = [];
+  const params = [];
 
-    const db = getConnection();
-    const placeholders = ids.map(() => '?').join(', ');
-
-    const imagePaths = db
-      .prepare(`SELECT local_path FROM article_images WHERE article_id IN (${placeholders})`)
-      .all(...ids)
-      .map(row => row.local_path);
-
-    const deleteStmt = db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`);
-    const deleted = db.transaction(() => deleteStmt.run(...ids).changes)();
-
-    const imagesRemoved = await imageHandler.deleteImageFiles(imagePaths);
-
-    return { deleted, imagesRemoved, imageCount: imagePaths.length };
+  if (title !== undefined) {
+    assignments.push('title = ?');
+    params.push(title);
   }
+  if (is_archived !== undefined) {
+    assignments.push('is_archived = ?');
+    params.push(is_archived ? 1 : 0);
+  }
+  if (is_favorite !== undefined) {
+    assignments.push('is_favorite = ?');
+    params.push(is_favorite ? 1 : 0);
+  }
+
+  return { assignments, params };
 }
 
 const articleService = new ArticleService();
