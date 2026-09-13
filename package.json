@@ -4,7 +4,10 @@
   "description": "Bookmark Digest - Self-hosted bookmarking and reading service",
   "private": true,
   "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix frontend install && node scripts/setup.mjs",
+    "dev": "node scripts/setup.mjs && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors blue,magenta \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
     "build": "npm --prefix frontend run build",
+    "serve": "npm run build && npm --prefix backend start",
     "start": "pm2 start ecosystem.config.js",
     "stop": "pm2 stop ecosystem.config.js",
     "restart": "pm2 restart ecosystem.config.js",
@@ -17,6 +20,7 @@
     "kill": "pm2 kill"
   },
   "devDependencies": {
+    "concurrently": "^10.0.5",
     "pm2": "^5.4.0"
   }
 }

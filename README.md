@@ -45,24 +45,41 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 - Node.js 18+ (Note: Node.js 24 may have compatibility issues with some native modules)
 - npm or yarn
 
-### 1. Backend Setup
+### Start everything from the root
 
 ```bash
-# Run this from the repository root first. The backend resolves its env file as
-# <repo>/.env, so a .env placed inside backend/ is silently ignored.
+npm run setup     # one-time: installs root, backend and frontend dependencies, creates .env
+npm run dev       # backend on :3001 and the UI on :5174, both auto-reloading
+```
+
+`npm run dev` runs both services in one terminal with prefixed output, and Ctrl-C stops both. On first
+start the backend prints an **API key** — the UI and the browser extension both need it.
+
+### Or serve it as a single process
+
+```bash
+npm run serve     # builds the UI, then serves the UI and the API together on :3001
+```
+
+Everything is then on `http://localhost:3001`: one process, one port, no CORS hop. The pm2 scripts
+(`npm start`, `npm stop`, `npm logs` …) run the same thing in the background.
+
+### Running each side by hand
+
+```bash
+# Backend. The env file belongs at the repository root - the backend resolves it
+# as <repo>/.env, so a .env placed inside backend/ is silently ignored.
 cp backend/.env.example .env
 
 cd backend
 npm install
-npm start
+npm run dev          # or: npm start
 ```
 
 The server will:
-1. Generate an API key on first run (saved to `config.json`)
+1. Generate an API key on first run (saved to `config.json` at the repository root)
 2. Initialize the SQLite database
 3. Start on `http://localhost:3001`
-
-### 2. Frontend Setup
 
 ```bash
 cd frontend
@@ -74,11 +91,10 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The web UI will be available at `http://localhost:5174`. Without `.env.local`, the UI calls `/api`, which the Vite dev server proxies to `http://localhost:3001`.
+The web UI is then at `http://localhost:5174`, and the Vite dev server proxies `/api` to
+`http://localhost:3001`. On first load you need to enter the API key from `config.json`.
 
-On first load, you'll need to enter the API key from `config.json` at the repository root.
-
-### 3. Browser Extension Installation
+### Browser Extension Installation
 
 1. Open your browser's extension management page:
    - Chrome: `chrome://extensions`

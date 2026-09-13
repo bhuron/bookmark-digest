@@ -19,6 +19,20 @@ Bookmark Digest is a self-hosted bookmarking and reading service that captures w
 
 ## Development Commands
 
+### Root (repository level)
+```bash
+npm run setup            # install root, backend and frontend deps, create .env
+npm run dev              # backend :3001 + Vite :5174, prefixed output, Ctrl-C stops both
+npm run build            # build the UI into frontend/dist
+npm run serve            # build, then serve UI + API from :3001 in the foreground
+npm start / stop / logs  # the same app under pm2, via ecosystem.config.js
+```
+
+`npm run dev` uses concurrently (a root devDependency) with `--kill-others-on-fail`, so a crash in one
+service tears both down instead of leaving half an app running. It also runs `scripts/setup.mjs` first,
+which creates the root `.env` on a fresh checkout - without it the backend would fall back to port 3000
+while the Vite proxy, the extension and the docs all assume 3001.
+
 ### Backend (in `/backend` directory)
 ```bash
 npm install              # Install dependencies
