@@ -11,22 +11,45 @@ import {
 import { formatRelativeTime, formatReadingTime, formatWordCount } from '../../utils/format';
 import { cn } from '../../utils/cn';
 
-export default function ArticleCard({ article, index = 0, isSelected = false, onToggleSelect }) {
+export default function ArticleCard({
+  article,
+  index = 0,
+  isSelected = false,
+  selectionActive = false,
+  onToggleSelect,
+}) {
+  const selectable = Boolean(onToggleSelect);
+  // While selecting, the whole card toggles, so the title stops being a link
+  const handleCardClick = selectable && selectionActive
+    ? () => onToggleSelect(article.id)
+    : undefined;
+
   return (
     <article
+      onClick={handleCardClick}
       className={cn(
         'group card transition-all duration-300 animate-fade-in-up',
         isSelected
           ? 'border-coral-400 shadow-coral-sm ring-1 ring-coral-300'
-          : 'hover:border-gallery-300 hover:shadow-gallery-md'
+          : 'hover:border-gallery-300 hover:shadow-gallery-md',
+        handleCardClick && 'cursor-pointer'
       )}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="p-6 lg:p-7">
         <div className="flex items-start gap-5">
-          {/* Selection Checkbox */}
-          {onToggleSelect && (
-            <label className="flex items-center pt-1 cursor-pointer">
+          {/* Invisible until it is useful: on hover, on keyboard focus, or once
+              selection mode is on */}
+          {selectable && (
+            <label
+              className={cn(
+                'flex items-center pt-1 cursor-pointer transition-opacity duration-200',
+                isSelected || selectionActive
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+              )}
+              onClick={(event) => event.stopPropagation()}
+            >
               <input
                 type="checkbox"
                 className="w-4 h-4 rounded border-gallery-300 text-coral-500 cursor-pointer focus:ring-coral-500"
@@ -39,9 +62,14 @@ export default function ArticleCard({ article, index = 0, isSelected = false, on
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Title - a trashed article has no detail page, so it is not a link */}
-            {article.is_trashed ? (
-              <h3 className="font-display font-semibold text-xl leading-snug text-gallery-500 line-clamp-2">
+            {/* Not a link while selecting, and never for a trashed article */}
+            {article.is_trashed || selectionActive ? (
+              <h3
+                className={cn(
+                  'font-display font-semibold text-xl leading-snug line-clamp-2',
+                  article.is_trashed ? 'text-gallery-500' : 'text-gallery-900'
+                )}
+              >
                 {article.title}
               </h3>
             ) : (
@@ -125,6 +153,7 @@ export default function ArticleCard({ article, index = 0, isSelected = false, on
               className="btn-icon"
               title="Open original"
               aria-label="Open original article"
+              onClick={(event) => event.stopPropagation()}
             >
               <ExternalLink className="w-4 h-4" strokeWidth={2} />
             </a>

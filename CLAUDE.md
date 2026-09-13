@@ -132,11 +132,11 @@ frontend/src/
 │   │   ├── Header.jsx    # App header with navigation
 │   │   └── Layout.jsx    # Main layout wrapper
 │   ├── Articles/
-│   │   ├── ArticleList.jsx    # Article list container + select-all header
-│   │   ├── ArticleCard.jsx    # Single article card (with selection checkbox)
+│   │   ├── ArticleList.jsx    # Plain list of cards, no selection chrome
+│   │   ├── ArticleCard.jsx    # Article card; checkbox fades in on hover/selection
 │   │   ├── ArticleViewer.jsx  # Full article content viewer
 │   │   ├── ArticleFilters.jsx  # Filter controls
-│   │   └── BulkActionBar.jsx  # Bulk archive/favourite/delete/restore actions
+│   │   └── BulkActionBar.jsx  # Floating pill: count, select-all, bulk actions
 │   └── Common/
 │       ├── SearchBar.jsx     # Search input
 │       ├── Pagination.jsx    # Pagination controls
@@ -346,6 +346,15 @@ The browser extension is **fully implemented** in the `/extension` directory.
   to an origin including the port, so `:5174` and `:3001` used to each demand the key separately. A key
   found only in localStorage is migrated into the cookie on first read
 - Base URL configurable via environment
+
+### Bulk selection
+Selection chrome is invisible by default: a card's checkbox fades in on hover (and on keyboard focus), and
+a quiet "Select" button in the page header turns selection mode on for touch and discoverability. While
+selection mode is on, clicking anywhere on a card toggles it and its title stops being a link, and a
+floating pill carries the count, one progressive select-all control ("Select all" -> "Select all N
+matching" -> "Deselect all"), the actions, and Done. Escape exits, as does changing page, search or
+filters. State lives in `Articles.jsx` as `isSelecting` (chrome on) and `scopeMode` (`page` vs `all`
+matching), with the scope maths in `utils/selection.js`.
 
 ## Testing Strategy
 

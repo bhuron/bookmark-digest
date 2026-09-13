@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckSquare } from 'lucide-react';
 import { articlesApi } from '../services/api';
 import SearchBar from '../components/Common/SearchBar';
 import ArticleList from '../components/Articles/ArticleList';
@@ -9,6 +10,7 @@ import Pagination from '../components/Common/Pagination';
 import {
   buildScope,
   canSelectAllMatching,
+  isAllSelected,
   selectedVisibleIds,
   toggleAll,
   toggleId,
@@ -26,7 +28,9 @@ export default function Articles() {
   });
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   // 'page' acts on the ticked rows, 'all' acts on everything matching the filter
-  const [selectionMode, setSelectionMode] = useState('page');
+  const [scopeMode, setScopeMode] = useState('page');
+  // Selection chrome stays invisible until the user asks for it
+  const [isSelecting, setIsSelecting] = useState(false);
   const [notice, setNotice] = useState(null);
 
   const queryClient = useQueryClient();
@@ -55,12 +59,17 @@ export default function Articles() {
   const total = articlesData?.data?.data?.total || 0;
   const trashedTotal = articlesData?.data?.data?.trashedTotal || 0;
 
+  const exitSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setScopeMode('page');
+    setIsSelecting(false);
+  }, []);
+
   // Selection is scoped to what is on screen, so changing the page, search or
   // filters clears it and rows the user can no longer see are never acted on
   useEffect(() => {
-    setSelectedIds(new Set());
-    setSelectionMode('page');
-  }, [page, filter]);
+    exitSelection();
+  }, [page, filter, exitSelection]);
 
   const selectedOnPage = useMemo(
     () => selectedVisibleIds(articles, selectedIds),
@@ -68,18 +77,37 @@ export default function Articles() {
   );
 
   const scope = useMemo(
-    () => buildScope({ mode: selectionMode, articles, selectedIds, filter }),
-    [selectionMode, articles, selectedIds, filter]
+    () => buildScope({ mode: scopeMode, articles, selectedIds, filter }),
+    [scopeMode, articles, selectedIds, filter]
   );
 
-  const selectedCount = selectionMode === 'all' ? total : selectedOnPage.length;
-  const targetLabel = selectionMode === 'all'
+  const selectedCount = scopeMode === 'all' ? total : selectedOnPage.length;
+  const targetLabel = scopeMode === 'all'
     ? `all ${total} matching article${total === 1 ? '' : 's'}`
     : `${selectedOnPage.length} article${selectedOnPage.length === 1 ? '' : 's'}`;
 
+  // The checkbox column and the action pill only exist while this is true
+  const selectionActive = isSelecting || selectedCount > 0;
+  const allOnPageSelected = isAllSelected(articles, selectedIds);
+
+  // Escape leaves selection mode, the way it dismisses anything else
+  useEffect(() => {
+    if (!selectionActive) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        exitSelection();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectionActive, exitSelection]);
+
   const settle = (text, undoScope) => {
-    setSelectedIds(new Set());
-    setSelectionMode('page');
+    exitSelection();
     setNotice({ text, undoScope });
     queryClient.invalidateQueries({ queryKey: ['articles'] });
     queryClient.invalidateQueries({ queryKey: ['stats'] });
@@ -157,6 +185,7 @@ export default function Articles() {
   };
 
   const handleToggleSelect = (id) => {
+    setIsSelecting(true);
     setSelectedIds((previous) => toggleId(previous, id));
   };
 
@@ -164,9 +193,10 @@ export default function Articles() {
     setSelectedIds((previous) => toggleAll(previous, articles.map((article) => article.id)));
   };
 
+  // Keeps selection mode on: the pill's "Deselect all" should not close it
   const handleClearSelection = () => {
     setSelectedIds(new Set());
-    setSelectionMode('page');
+    setScopeMode('page');
   };
 
   const handleDelete = () => {
@@ -210,15 +240,30 @@ export default function Articles() {
   return (
     <div className="animate-fade-in-up">
       {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 tracking-tight mb-2">
-          {isTrash ? 'Trash' : 'Library'}
-        </h1>
-        <p className="text-gallery-500 text-lg">
-          {isTrash
-            ? 'Articles here are hidden from your library until you restore them'
-            : 'Your curated collection of saved articles'}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display font-bold text-3xl lg:text-4xl text-gallery-900 tracking-tight mb-2">
+            {isTrash ? 'Trash' : 'Library'}
+          </h1>
+          <p className="text-gallery-500 text-lg">
+            {isTrash
+              ? 'Articles here are hidden from your library until you restore them'
+              : 'Your curated collection of saved articles'}
+          </p>
+        </div>
+
+        {/* The only always-visible trace of bulk selection - and it stays quiet */}
+        {total > 0 && !selectionActive && (
+          <button
+            type="button"
+            className="btn btn-ghost shrink-0"
+            onClick={() => setIsSelecting(true)}
+            title="Select several articles"
+          >
+            <CheckSquare className="w-4 h-4 mr-1.5" strokeWidth={2} />
+            Select
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -257,8 +302,8 @@ export default function Articles() {
           articles={articles}
           isLoading={articlesLoading}
           selectedIds={selectedIds}
+          selectionActive={selectionActive}
           onToggleSelect={handleToggleSelect}
-          onToggleSelectAll={handleToggleSelectAll}
           emptyMessage={isTrash
             ? 'Nothing in the trash'
             : 'Use the browser extension to save your first article'}
@@ -268,22 +313,26 @@ export default function Articles() {
       {/* Pagination */}
       <Pagination page={page} limit={PAGE_SIZE} total={total} onPageChange={setPage} />
 
-      {/* Bulk actions */}
+      {/* Bulk actions, floating and only while selecting */}
       <BulkActionBar
+        visible={selectionActive}
         count={selectedCount}
         total={total}
-        mode={selectionMode}
+        mode={scopeMode}
         isTrash={isTrash}
         isBusy={busy}
+        allOnPageSelected={allOnPageSelected}
         canSelectAllMatching={canSelectAllMatching(articles, selectedIds, total)}
-        onSelectAllMatching={() => setSelectionMode('all')}
+        onSelectAll={handleToggleSelectAll}
+        onSelectAllMatching={() => setScopeMode('all')}
+        onClearSelection={handleClearSelection}
         onArchive={handleArchive}
         onFavorite={handleFavorite}
         onDelete={handleDelete}
         onRestore={handleRestore}
         onPurge={handlePurge}
         onEmptyTrash={handleEmptyTrash}
-        onClear={handleClearSelection}
+        onExit={exitSelection}
       />
     </div>
   );
