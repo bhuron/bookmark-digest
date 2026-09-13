@@ -1,7 +1,18 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import epubGenerator from '../epubGenerator.js';
+import { setupTestDatabase, teardownTestDatabase } from '../../__tests__/utils/testDatabase.js';
 
 describe('EPUBGenerator', () => {
+  // These tests exercise real SQL, so give the suite its own migrated database
+  // instead of depending on one already existing on the machine
+  beforeAll(async () => {
+    await setupTestDatabase('epub-generator');
+  });
+
+  afterAll(() => {
+    teardownTestDatabase();
+  });
+
   describe('listExports', () => {
     it('should have listExports method', () => {
       expect(epubGenerator.listExports).toBeDefined();
