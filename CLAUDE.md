@@ -25,8 +25,13 @@ npm run setup            # install root, backend and frontend deps, create .env
 npm run dev              # backend :3001 + Vite :5174, prefixed output, Ctrl-C stops both
 npm run build            # build the UI into frontend/dist
 npm run serve            # build, then serve UI + API from :3001 in the foreground
+npm run backup           # copy the database, config.json and .env to backups/<timestamp>/
 npm start / stop / logs  # the same app under pm2, via ecosystem.config.js
 ```
+
+`npm run backup` uses SQLite's `VACUUM INTO` rather than `cp`, because in WAL mode the newest commits can
+still be in the `-wal` file and a plain copy can be silently stale. If you ever add state that cannot be
+rebuilt from the repository, add it to `scripts/backup.mjs`.
 
 `npm run dev` uses concurrently (a root devDependency) with `--kill-others-on-fail`, so a crash in one
 service tears both down instead of leaving half an app running. It also runs `scripts/setup.mjs` first,

@@ -249,6 +249,29 @@ SQLite database with the following tables:
 - `settings` - Application settings (Kindle email, SMTP config, etc.)
 - `_migrations` - Tracks applied database migrations
 
+## Backup and restore
+
+Your articles, the Kindle/SMTP settings, the API key and the SMTP password exist only in
+`backend/data/bookmark-digest.db`, `config.json` and `.env` — none of which are in git. Losing them means
+recreating all of it.
+
+```bash
+npm run backup                  # -> backups/<timestamp>/
+npm run backup -- /path/to/dir  # -> somewhere else, e.g. a synced folder
+```
+
+That copies the database, `config.json` and `.env`, all with owner-only (`600`) permissions. The database
+is copied with SQLite's `VACUUM INTO`, not `cp`: in WAL mode recent commits can still be in the `-wal`
+file, so a plain file copy can produce a stale or torn backup with no error. Image files
+(`backend/images/`) and EPUB exports are not included.
+
+To restore, stop the server and copy the files back:
+
+```bash
+cp backups/<timestamp>/bookmark-digest.db backend/data/bookmark-digest.db
+cp backups/<timestamp>/config.json .
+```
+
 ## Configuration
 
 Environment variables (see `backend/.env.example`):

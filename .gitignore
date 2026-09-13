@@ -11,6 +11,9 @@ data/
 *.db-shm
 *.db-wal
 
+# Backups made by `npm run backup` - they contain the API key and SMTP password
+backups/
+
 # Logs
 logs/
 *.log
