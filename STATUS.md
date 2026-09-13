@@ -209,9 +209,8 @@ These are transitive dependencies from jsdom and don't affect functionality.
 ## Quick Reference
 
 ### API Key
-Your generated API key: `2d58bb929bde902b3b87e83bcfe7e0f2f3cc557cf79dab1bc3b6bfef9a5c60e7`
-
-Stored in: `backend/config.json`
+The API key is generated on first server start and written to `config.json` at the repository root.
+View it with `cat config.json`, or read it from the server console, which prints it when generated.
 
 ### Test Commands
 

@@ -21,13 +21,13 @@ React frontend for Bookmark Digest application.
 
 ## Configuration
 
-The frontend connects to the backend API at `http://localhost:3001/api` by default.
+The frontend calls `/api` by default (`VITE_API_BASE` is unset), and the Vite dev server proxies `/api` and `/images` to `http://localhost:3001` — see `vite.config.js`. Set `VITE_API_BASE` in `frontend/.env.local` only if you need a different backend URL.
 
 ### API Key
 
 To use the app, you need to configure your API key:
 
-1. Get the API key from `backend/config.json`
+1. Get the API key from `config.json` at the repository root
 2. Open the app and go to Settings
 3. Enter the API key
 

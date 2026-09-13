@@ -21,7 +21,7 @@
         <h2>API Configuration</h2>
         <p class="help-text">
           Enter the API key from your Bookmark Digest backend server.
-          The key is stored in <code>backend/config.json</code>.
+          The key is stored in <code>config.json</code> at the repository root.
         </p>
 
         <form id="settings-form" class="form">
@@ -37,7 +37,7 @@
               required
             >
             <p class="hint">
-              Find your API key in <code>backend/config.json</code> after starting the server
+              Find your API key in <code>config.json</code> (repository root) after starting the server
             </p>
           </div>
 
@@ -75,7 +75,7 @@
         <h2>How to Use</h2>
         <ol class="steps">
           <li>Make sure the backend server is running: <code>cd backend && npm run dev</code></li>
-          <li>Copy the API key from <code>backend/config.json</code></li>
+          <li>Copy the API key from <code>config.json</code> (repository root)</li>
           <li>Paste the API key above and click "Save Settings"</li>
           <li>Click "Test Connection" to verify</li>
           <li>Navigate to any article and click the extension icon to save</li>
@@ -85,13 +85,14 @@
       <section class="card">
         <h2>First Time Setup</h2>
         <div class="code-block">
-          <p><strong># In the backend directory:</strong></p>
-          <pre><code>npm install
-cp .env.example .env
+          <p><strong># From the repository root:</strong></p>
+          <pre><code>cp backend/.env.example .env
+cd backend
+npm install
 npm run dev</code></pre>
           <p class="help-text">
             The server will start on <code>http://localhost:3001</code>
-            and generate an API key in <code>config.json</code>
+            and generate an API key in <code>config.json</code> (repository root)
           </p>
         </div>
       </section>
@@ -132,7 +133,7 @@ npm run dev</code></pre>
           </div>
           <div class="info-item">
             <span class="info-label">Permissions</span>
-            <span class="info-value">activeTab, scripting, storage, notifications</span>
+            <span class="info-value">activeTab, scripting, storage</span>
           </div>
         </div>
       </section>

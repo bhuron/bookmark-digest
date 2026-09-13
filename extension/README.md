@@ -8,7 +8,7 @@ Manifest V3 browser extension for capturing web articles and saving them to your
 - **Paywall Bypass**: Captures rendered DOM (works if you're logged in)
 - **API Key Authentication**: Secure communication with backend
 - **Connection Testing**: Verify backend connectivity from options page
-- **Notifications**: Visual feedback for save success/failure
+- **Status Feedback**: A colored toolbar badge shows capturing / processing / saved / failed (see [Known Limitations](#known-limitations))
 
 ## Installation
 
@@ -30,16 +30,18 @@ Manifest V3 browser extension for capturing web articles and saving them to your
 
 1. **Start the Backend Server**:
    ```bash
+   # From the repository root first — the backend resolves its env file as
+   # <repo>/.env, so a .env placed inside backend/ is silently ignored.
+   cp backend/.env.example .env
+
    cd backend
    npm install
-   cp .env.example .env
    npm run dev
    ```
 
 2. **Get Your API Key**:
-   - The server generates an API key automatically
-   - Find it in `backend/config.json`
-   - Example: `2d58bb929bde902b3b87e83bcfe7e0f2f3cc557cf79dab1bc3b6bfef9a5c60e7`
+   - The server generates an API key automatically on first run and prints it to the console
+   - Find it in `config.json` at the **repository root** (not `backend/config.json`)
 
 3. **Configure Extension**:
    - Right-click the extension icon → **Options**
@@ -70,7 +72,7 @@ The extension connects to `http://localhost:3001` by default. To change this:
 Currently, saved articles can be accessed via:
 - **API**: Use the REST endpoints directly
 - **Database**: Query `backend/data/bookmark-digest.db`
-- **Web UI**: Coming in Phase 8 (Frontend)
+- **Web UI**: Browse and manage articles at `http://localhost:5174`
 
 ### Troubleshooting
 
@@ -80,7 +82,7 @@ Currently, saved articles can be accessed via:
 
 **Solution**:
 1. Right-click extension icon → Options
-2. Paste API key from `backend/config.json`
+2. Paste the API key from `config.json` at the repository root
 3. Save settings
 
 #### "Server is not running" Error
@@ -98,7 +100,7 @@ npm run dev
 **Cause**: Incorrect API key in extension settings
 
 **Solution**:
-1. Copy API key from `backend/config.json`
+1. Copy the API key from `config.json` at the repository root
 2. Update in extension options
 3. Test connection
 
@@ -135,7 +137,6 @@ The extension requires the following permissions:
 - **activeTab**: Access the current tab's content
 - **scripting**: Inject scripts to capture page content
 - **storage**: Save API key in local storage
-- **notifications**: Show save success/failure messages
 
 ## Architecture
 
@@ -218,6 +219,12 @@ The extension logs to:
 - ✅ Chrome/Edge (Manifest V3)
 - ⚠️ Firefox (Manifest V3 support in progress)
 - ❌ Safari (Manifest V3 not supported)
+
+## Known Limitations
+
+- **In-page toasts do not render.** `background.js` calls `window.bdToast.show()`, but `window.bdToast` is never defined and `content.js` is neither declared in `manifest.json` nor injected, so only the toolbar badge appears. `content.js` is currently inert.
+- **Icons are 1×1 placeholders.** `extension/icons/icon{16,48,128}.png` are 1×1 PNGs; regenerate them (see [Icons](#icons)) for real artwork.
+- **Firefox MV3 support is partial.** `manifest.json` declares `background.service_worker`, whereas Firefox expects `background.scripts`.
 
 ## Security
 

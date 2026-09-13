@@ -342,11 +342,8 @@
 
 ## Generated API Key
 
-```
-2d58bb929bde902b3b87e83bcfe7e0f2f3cc557cf79dab1bc3b6bfef9a5c60e7
-```
-
-Stored in: `backend/config.json`
+The API key is generated on first server start and written to `config.json` at the repository root.
+View it with `cat config.json`, or read it from the server console, which prints it when generated.
 
 ## Testing Commands
 
@@ -361,7 +358,7 @@ npm run lint             # Run ESLint
 curl http://localhost:3001/health
 
 # API status (with auth)
-API_KEY="2d58bb929bde902b3b87e83bcfe7e0f2f3cc557cf79dab1bc3b6bfef9a5c60e7"
+API_KEY=$(node -e "console.log(require('./config.json').apiKey)")
 curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 
 # Create article

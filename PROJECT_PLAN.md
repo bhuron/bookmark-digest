@@ -889,11 +889,12 @@ API_RATE_LIMIT=100
 git clone <repository>
 cd bookmark-digest
 
-# Backend setup
+# Backend setup (the env file belongs at the repository root, not in backend/)
+cp backend/.env.example .env
+# Edit .env with your configuration
+
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your configuration
 
 # Frontend setup
 cd ../frontend
@@ -905,20 +906,24 @@ cd ../extension
 ```
 
 #### Development Scripts
+Root `package.json` drives pm2 (`ecosystem.config.js`), and each app has its own scripts:
+
 ```json
 {
   "scripts": {
-    "dev:backend": "nodemon src/index.js",
-    "dev:frontend": "vite",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build:frontend": "vite build",
-    "start": "node src/index.js",
-    "test": "jest",
-    "lint": "eslint src/",
-    "db:migrate": "node scripts/migrate.js"
+    "start": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop ecosystem.config.js",
+    "restart": "pm2 restart ecosystem.config.js",
+    "reload": "pm2 reload ecosystem.config.js",
+    "logs": "pm2 logs",
+    "status": "pm2 status"
   }
 }
 ```
+
+- `backend/`: `dev` (nodemon), `start`, `migrate`, `lint`, `test`
+- `frontend/`: `dev` (vite), `build`, `preview`, `lint`, `test`
+- pm2 is a root devDependency, so run `npm install` at the repository root before `npm start`
 
 ### 11. Testing Strategy
 
@@ -1150,23 +1155,24 @@ async function getArticlesWithCache(options) {
 git clone <repository-url>
 cd bookmark-digest
 
-# Setup backend
+# Setup backend (the env file belongs at the repository root, not in backend/)
+cp backend/.env.example .env
+# Edit .env with your SMTP and Kindle settings
+
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your SMTP and Kindle settings
 
 # Setup frontend
 cd ../frontend
 npm install
 
-# Start development servers
+# Start development servers (each in its own terminal)
 cd ../backend
-npm run dev:backend
+npm run dev
 
 # In another terminal
 cd ../frontend
-npm run dev:frontend
+npm run dev
 
 # Load extension
 # 1. Open Chrome/Edge → chrome://extensions

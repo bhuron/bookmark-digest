@@ -22,13 +22,14 @@ Bookmark Digest is a self-hosted bookmarking and reading service that captures w
 ### Backend (in `/backend` directory)
 ```bash
 npm install              # Install dependencies
-cp .env.example .env     # Configure environment (generates API key automatically)
 npm run dev              # Start development server with nodemon
 npm start                # Start production server
 npm run migrate          # Run database migrations manually
 npm run lint             # Run ESLint
 npm test                 # Run Jest tests
 ```
+
+> **Env file location:** create `.env` at the **repository root** (`cp backend/.env.example .env` from the repo root). `backend/src/config.js` resolves it as `<repo>/.env`, so a `.env` placed in `backend/` is silently ignored and the server falls back to defaults (e.g. `PORT=3000`). The generated API key is written to `<repo>/config.json`.
 
 ### Frontend (in `/frontend` directory)
 ```bash
@@ -42,7 +43,7 @@ npm test                 # Run Vitest tests
 
 ### Database
 - Database auto-initializes on server start via migrations
-- Location: `./data/bookmark-digest.db` (configurable via `DB_PATH` env var)
+- Location: `./data/bookmark-digest.db` relative to the **backend** working directory (configurable via `DB_PATH` env var), i.e. `backend/data/bookmark-digest.db` when started from `backend/`
 - Migration files: `backend/migrations/*.sql`
 - Manual migration: `npm run migrate` (runs `src/database/migrate.js`)
 
@@ -180,6 +181,12 @@ frontend/src/
 
 ## Environment Configuration
 
+Copy the template to the **repository root** (not `backend/`):
+
+```bash
+cp backend/.env.example .env
+```
+
 Key environment variables (see `backend/.env.example`):
 
 ```bash
@@ -244,8 +251,8 @@ The browser extension is **fully implemented** in the `/extension` directory.
 
 ### Extension Files
 - `manifest.json` - Extension configuration
-- `background.js` - Service worker, handles extension icon clicks
-- `content.js` - Injected script to capture DOM
+- `background.js` - Service worker, handles extension icon clicks and performs the capture via `chrome.scripting.executeScript`
+- `content.js` - Inert: not declared in `manifest.json` and never injected; the capture function is injected inline from `background.js`
 - `options.html` + `options.js` - Settings page
 
 ### Extension Features
@@ -253,7 +260,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 - Stage-by-stage progress indicators (capturing → processing → saved)
 - API key configuration and validation
 - Connection testing with backend
-- Success notifications with article stats (word count, reading time)
+- Status feedback via a colored toolbar badge (capturing → processing → saved/failed). In-page toasts do **not** render: `background.js` calls `window.bdToast.show()`, but nothing defines `window.bdToast` and `content.js` is never injected
 - First-run setup flow (auto-opens options page)
 
 ## Important Constraints

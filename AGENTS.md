@@ -19,13 +19,14 @@ Bookmark Digest is a self-hosted bookmarking and reading service that captures w
 ### Backend (`/backend` directory)
 
 ```bash
+# Run this from the repository root first: the backend resolves its env file as
+# <repo>/.env, so a .env placed inside backend/ is silently ignored.
+cp backend/.env.example .env
+
 cd backend
 
 # Install dependencies
 npm install
-
-# Copy environment configuration (generates API key automatically)
-cp .env.example .env
 
 # Start development server with nodemon
 npm run dev
@@ -146,7 +147,7 @@ No build system currently; load unpacked extension in browser developer mode.
 ## Environment Configuration
 
 ### Backend
-- Copy `backend/.env.example` to `backend/.env`.
+- Copy `backend/.env.example` to `.env` **at the repository root** — `backend/src/config.js` resolves it as `<repo>/.env`, so `backend/.env` is silently ignored and the server falls back to its defaults (e.g. `PORT=3000`).
 - API key is auto‑generated on first run and stored in `config.json` at repository root.
 - Key environment variables: `PORT`, `DB_PATH`, `LOG_LEVEL`, `CORS_ORIGIN`, `MAX_IMAGE_SIZE_MB`, etc.
 

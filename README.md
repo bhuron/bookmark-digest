@@ -46,12 +46,12 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 ### 1. Backend Setup
 
 ```bash
-cd backend
-npm install
-
-# Copy environment configuration (creates .env at project root)
+# Run this from the repository root first. The backend resolves its env file as
+# <repo>/.env, so a .env placed inside backend/ is silently ignored.
 cp backend/.env.example .env
 
+cd backend
+npm install
 npm start
 ```
 
@@ -66,15 +66,15 @@ The server will:
 cd frontend
 npm install
 
-# Optional: Copy environment configuration (for custom API base URL)
+# Optional: only needed for a custom API base URL
 cp .env.example .env.local
 
 npm run dev
 ```
 
-The web UI will be available at `http://localhost:5174`
+The web UI will be available at `http://localhost:5174`. Without `.env.local`, the UI calls `/api`, which the Vite dev server proxies to `http://localhost:3001`.
 
-On first load, you'll need to enter the API key from `backend/config.json`.
+On first load, you'll need to enter the API key from `config.json` at the repository root.
 
 ### 3. Browser Extension Installation
 
@@ -88,7 +88,7 @@ On first load, you'll need to enter the API key from `backend/config.json`.
 
 4. Click the extension icon to configure:
    - Set the Backend URL (default: `http://localhost:3001`)
-   - Enter your API key (from `backend/config.json`)
+   - Enter your API key (from `config.json` at the repository root)
 
 5. Test by clicking the extension icon on any article page
 
@@ -98,8 +98,8 @@ On first load, you'll need to enter the API key from `backend/config.json`.
 # Backend health check (no auth required)
 curl http://localhost:3001/health
 
-# Check API status (requires API key)
-API_KEY=$(cat backend/config.json | grep apiKey -A 1 | grep -o '"[^"]*"' | tail -1)
+# Check API status (requires API key; run from the repository root)
+API_KEY=$(node -e "console.log(require('./config.json').apiKey)")
 curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 ```
 
@@ -111,7 +111,7 @@ All `/api/*` endpoints require an API key sent via the `X-API-Key` header:
 curl -H "X-API-Key: YOUR_API_KEY" http://localhost:3001/api/articles
 ```
 
-The API key is automatically generated on first run and saved to `backend/config.json`.
+The API key is automatically generated on first run and saved to `config.json` at the repository root.
 
 ## NPM Deprecation Warnings
 
@@ -268,7 +268,7 @@ The tag feature was previously implemented but has been removed due to bugs. All
 - **EPUB library** - Replaced buggy @storyteller-platform/epub with @lesjoursfr/html-to-epub
 - **EPUB spine** - Fixed broken spine structure causing Kindle rejection
 - **SMTP validation** - Fixed validation for optional fromEmail field
-- **UI notifications** - Modernized extension UI with in-page toast notifications
+- **Extension save feedback** - Toolbar badge shows capturing → processing → saved/failed (badge only; the in-page toast path is not wired up)
 
 ## Future Enhancements
 
@@ -293,7 +293,7 @@ PORT=3002 npm start
 
 ### Database Issues
 ```bash
-# Re-run migrations
+# From the backend/ directory
 npm run migrate
 
 # Or delete and start fresh
@@ -303,12 +303,12 @@ npm start
 
 ### API Key Issues
 ```bash
-# View your API key
-cat backend/config.json
+# View your API key (from the repository root)
+cat config.json
 
-# Regenerate (delete config.json and restart)
-rm backend/config.json
-npm start
+# Regenerate: delete it and restart the server
+rm config.json
+cd backend && npm start
 ```
 
 ## Development
