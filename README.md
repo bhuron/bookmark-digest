@@ -64,6 +64,9 @@ npm run serve     # builds the UI, then serves the UI and the API together on :3
 Everything is then on `http://localhost:3001`: one process, one port, no CORS hop. The pm2 scripts
 (`npm start`, `npm stop`, `npm logs` …) run the same thing in the background.
 
+There is no Vite dev server in this mode, so **nothing listens on `:5174`** — that port only exists
+under `npm run dev`. The backend prints the Web UI URL it is serving on startup.
+
 ### Running each side by hand
 
 ```bash

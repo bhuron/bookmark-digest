@@ -106,8 +106,9 @@ app.get('/api/status', validateApiKey, (req, res) => {
 // this is skipped until the frontend has been built.
 const frontendDist = path.join(__dirname, '../../frontend/dist');
 const frontendIndex = path.join(frontendDist, 'index.html');
+const servesFrontend = fs.existsSync(frontendIndex);
 
-if (fs.existsSync(frontendIndex)) {
+if (servesFrontend) {
   app.use(express.static(frontendDist, {
     index: false,
     setHeaders: (res, filePath) => {
@@ -181,9 +182,22 @@ app.listen(PORT, () => {
   console.log(`\n========================================`);
   console.log(`  🚀 Bookmark Digest Server`);
   console.log(`========================================`);
-  console.log(`  Server: http://localhost:${PORT}`);
-  console.log(`  Health: http://localhost:${PORT}/health`);
-  console.log(`  Status: http://localhost:${PORT}/api/status`);
+  console.log(`  API:     http://localhost:${PORT}/api`);
+  console.log(`  Health:  http://localhost:${PORT}/health`);
+
+  if (servesFrontend) {
+    console.log(`  Web UI:  http://localhost:${PORT}`);
+
+    // Say which of the two UIs this is, otherwise it is easy to sit on the
+    // built copy wondering why changes on :5174 are not showing up
+    if (getConfig('NODE_ENV', 'development') !== 'production') {
+      console.log(`           (the built UI; live reload runs on :5174 with "npm run dev")`);
+    }
+  } else {
+    console.log(`  Web UI:  none built - "npm run serve" for a built UI on this port,`);
+    console.log(`           or "npm run dev" for the dev server on :5174`);
+  }
+
   console.log(`========================================\n`);
 });
 
