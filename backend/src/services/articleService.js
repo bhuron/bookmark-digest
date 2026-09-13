@@ -1,6 +1,7 @@
 import { getConnection } from '../database/index.js';
 import imageHandler from './imageHandler.js';
 import logger from '../utils/logger.js';
+import { buildMatchExpression } from '../utils/ftsQuery.js';
 
 /**
  * Accepted `sort_by` values mapped to safe ORDER BY clauses. User input is only
@@ -45,9 +46,15 @@ function filterScope({ search, is_archived, is_favorite, trashed } = {}) {
   conditions.push(isTrue(trashed) ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL');
 
   if (search) {
-    conditions.push('(title LIKE ? OR content_text LIKE ? OR excerpt LIKE ?)');
-    const term = `%${search}%`;
-    params.push(term, term, term);
+    const match = buildMatchExpression(search);
+
+    if (match) {
+      // A subquery rather than a JOIN, so the clause stays reusable by SELECT,
+      // UPDATE and DELETE - which is what lets a bulk operation carry a search
+      // filter. FTS5 answers this from the index instead of scanning every body.
+      conditions.push('id IN (SELECT rowid FROM articles_fts WHERE articles_fts MATCH ?)');
+      params.push(match);
+    }
   }
 
   if (is_archived !== undefined) {

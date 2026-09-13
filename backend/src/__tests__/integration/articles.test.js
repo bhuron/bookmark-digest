@@ -896,4 +896,145 @@ describe('Articles API Integration Tests', () => {
       });
     });
   });
+
+  describe('Full-text search (FTS5)', () => {
+    const seed = async ({ title, body, url }) => {
+      const response = await request(app)
+        .post('/api/articles')
+        .set(createAuthHeaders())
+        .send({
+          html: `<html><head><title>${title}</title></head><body><article><h1>${title}</h1><p>${body}</p></article></body></html>`,
+          url
+        });
+
+      return response.body.article.id;
+    };
+
+    const search = (term) => request(app)
+      .get(`/api/articles?search=${encodeURIComponent(term)}`)
+      .set(createAuthHeaders());
+
+    it('should match words in the article body, not just the title', async () => {
+      await seed({
+        title: 'Ordinary heading',
+        body: 'A long body mentioning kubernetes orchestration in passing, with enough words to be extracted.',
+        url: 'https://example.com/fts-body'
+      });
+
+      const response = await search('kubernetes');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.total).toBe(1);
+    });
+
+    it('should match a word prefix', async () => {
+      await seed({
+        title: 'Prefix check',
+        body: 'Content about orchestration and containers, written with enough words to be extracted.',
+        url: 'https://example.com/fts-prefix'
+      });
+
+      expect((await search('orchestr')).body.data.total).toBe(1);
+    });
+
+    it('should require every term to match', async () => {
+      await seed({
+        title: 'Alpha beta',
+        body: 'Body text that mentions alpha only, with enough words for extraction to work here.',
+        url: 'https://example.com/fts-and'
+      });
+
+      expect((await search('alpha')).body.data.total).toBe(1);
+      expect((await search('alpha beta')).body.data.total).toBe(1);
+      expect((await search('alpha gamma')).body.data.total).toBe(0);
+    });
+
+    it('should ignore diacritics', async () => {
+      await seed({
+        title: 'Le café du coin',
+        body: 'A review of the cafe with enough words for the extractor to keep this article.',
+        url: 'https://example.com/fts-diacritics'
+      });
+
+      expect((await search('cafe')).body.data.total).toBe(1);
+    });
+
+    it('should not fail on FTS operator characters', async () => {
+      await seed({
+        title: 'Quoting check',
+        body: 'Body about quotes and operators, with enough words for extraction to happen here.',
+        url: 'https://example.com/fts-operators'
+      });
+
+      for (const term of ['"', '*', 'foo"bar', 'AND', 'NOT (x)', 'a OR b', '"*"']) {
+        const response = await search(term);
+        expect(response.status).toBe(200);
+      }
+    });
+
+    it('should not match trashed articles', async () => {
+      const id = await seed({
+        title: 'Zebra migration',
+        body: 'A body about zebras with enough words for extraction to succeed properly.',
+        url: 'https://example.com/fts-trash'
+      });
+
+      expect((await search('zebra')).body.data.total).toBe(1);
+
+      await request(app).delete(`/api/articles/${id}`).set(createAuthHeaders());
+
+      expect((await search('zebra')).body.data.total).toBe(0);
+    });
+
+    it('should allow a bulk operation to carry a search filter', async () => {
+      await seed({
+        title: 'Walrus one',
+        body: 'Body about walruses with enough words for extraction to succeed here.',
+        url: 'https://example.com/fts-bulk-1'
+      });
+      await seed({
+        title: 'Walrus two',
+        body: 'Another body about walruses with enough words for extraction to work.',
+        url: 'https://example.com/fts-bulk-2'
+      });
+      await seed({
+        title: 'Unrelated',
+        body: 'Nothing relevant here, just enough words for the extractor to keep it.',
+        url: 'https://example.com/fts-bulk-3'
+      });
+
+      const response = await request(app)
+        .put('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ filter: { search: 'walrus' }, is_favorite: true });
+
+      expect(response.body).toHaveProperty('updated', 2);
+
+      const favorites = await request(app)
+        .get('/api/articles?is_favorite=true')
+        .set(createAuthHeaders());
+      expect(favorites.body.data.total).toBe(2);
+    });
+
+    it('should keep the index in step when a title is updated', async () => {
+      const id = await seed({
+        title: 'Indexed title',
+        body: 'Body about originaltopic with enough words for extraction to work.',
+        url: 'https://example.com/fts-update'
+      });
+
+      expect((await search('originaltopic')).body.data.total).toBe(1);
+      expect((await search('renamedtopic')).body.data.total).toBe(0);
+
+      await request(app)
+        .put(`/api/articles/${id}`)
+        .set(createAuthHeaders())
+        .send({ title: 'Renamed to renamedtopic' });
+
+      expect((await search('renamedtopic')).body.data.total).toBe(1);
+
+      // The body is untouched, so its terms stay indexed
+      expect((await search('originaltopic')).body.data.total).toBe(1);
+    });
+  });
 });

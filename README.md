@@ -7,6 +7,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 - **Browser Extension** (Chrome/Firefox) - One-click article capture from any webpage
 - **Web UI** - React-based interface for managing articles
 - **Trash & Undo** - Deleting moves articles to a trash you can restore from, individually or in bulk
+- **Full-text search** - SQLite FTS5 index over titles and article text; word-prefix matching, diacritic-insensitive
 - **EPUB Generation** - Batch convert articles to EPUB 3.3 format
 - **Kindle Integration** - Email EPUBs directly to your Kindle
 - **Local Storage** - SQLite database with all content stored locally
@@ -198,6 +199,9 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 
 The bulk endpoints target either `{ "ids": [1, 2, 3] }` (max 500) or `{ "filter": { ... } }`, which
 selects the whole matching set server-side — that is how "select all N matching" spans pages.
+
+Search (`?search=`) is served from the FTS5 index rather than a `LIKE` scan: terms match whole words by
+prefix and ignore diacritics, so `cafe` finds "café".
 
 ### EPUB
 - `POST /api/epub/generate` - Generate EPUB from articles

@@ -94,7 +94,11 @@ backend/src/
 │   ├── validation.js     # Request validation with express-validator
 │   └── rateLimiter.js    # Rate limiting (express-rate-limit)
 └── utils/
-    └── logger.js         # Winston logger
+    ├── logger.js         # Winston logger
+    ├── placeholders.js   # Detect .env.example sentinel values
+    ├── filePermissions.js # 0600 on secrets (API key, env file, database)
+    ├── ftsQuery.js       # Safe FTS5 MATCH expressions
+    └── spaRoutes.js      # Paths the SPA fallback must not swallow
 ```
 
 ### Frontend Structure
@@ -150,6 +154,8 @@ frontend/src/
   generation all exclude. Re-capturing the same URL revives the row. Only purging deletes it for real
 - Triggers auto-update `updated_at` timestamp
 - Indexes on `created_at`, `is_archived`, `is_favorite`, `site_name`, `language`
+- `articles_fts` is an FTS5 index over title/content_text/excerpt, kept in step by three triggers
+  (migration 003). It is an external content table, so the article text is not duplicated
 - **Tag tables removed:** Do not reference `tags` or `article_tags` tables - they were deleted
 
 ### Migrations System
@@ -253,6 +259,14 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 - Deleting articles removes their recorded image files and prunes directories left empty; every path is validated to stay inside the images directory
 - Trashing keeps image files so the delete stays reversible - only purging removes them
 
+### Search
+Searching is answered by the `articles_fts` FTS5 index via `utils/ftsQuery.js`, which turns input into one
+quoted prefix query per term (`"rust"* "async"*`). The quoting is what stops a stray `"` or a lone `OR`
+from becoming an FTS syntax error. Semantics differ from the `LIKE '%term%'` scan it replaced: matching is
+per token and prefix-based, so `rust` finds "rustacean" while `ust` no longer matches "rust", and
+diacritics are ignored (`cafe` finds "café"). The filter is a subquery on `id`, so bulk operations can
+carry a search term and stay index-backed.
+
 ### Reading Time Calculation
 - Based on 200 words per minute average
 - `wordCount = article.textContent.split(/\s+/).length`
@@ -322,7 +336,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 - Currently pure unit tests under `src/utils/`; React Testing Library is not installed, so there are no component tests yet
 
 ### Test Status
-- Backend: 10 Jest suites (routes, services, database, config, utils, integration)
+- Backend: 11 Jest suites (routes, services, database, config, utils, integration)
 - Frontend: pure unit tests for `utils/selection.js` and `utils/articleFilters.js`; no component tests yet
 - CI (`.github/workflows/ci.yml`) runs lint + tests on every push and pull request
 
