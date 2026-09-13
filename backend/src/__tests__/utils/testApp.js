@@ -9,7 +9,7 @@ process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
 
 import { closeConnection, initializeDatabase } from '../../database/index.js';
-import { ensureConfig } from '../../config.js';
+import { ensureConfig, getArticleBodyLimit } from '../../config.js';
 import { validateApiKey } from '../../middleware/auth.js';
 import { errorHandler } from '../../middleware/errorHandler.js';
 
@@ -31,7 +31,7 @@ export function createTestApp() {
   app.use(helmet());
   app.use(compression());
   app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({ limit: getArticleBodyLimit() }));
   app.use(express.urlencoded({ extended: true }));
 
   // Health check (no auth required)
@@ -80,7 +80,7 @@ export function cleanupTestDatabase() {
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
-  } catch (error) {
+  } catch {
     // Ignore cleanup errors
   }
 }
@@ -96,7 +96,7 @@ export async function resetTestDatabase() {
     db.exec('DELETE FROM epub_exports');
     db.exec('DELETE FROM article_images');
     db.exec('DELETE FROM articles');
-  } catch (error) {
+  } catch {
     // Ignore errors
   }
 }

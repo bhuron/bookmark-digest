@@ -12,7 +12,6 @@ jest.mock('../../middleware/rateLimiter.js', () => ({
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
-import fs from 'fs/promises';
 import {
   createTestApp,
   setupTestDatabase,

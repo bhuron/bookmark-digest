@@ -6,6 +6,7 @@ import ArticleList from '../components/Articles/ArticleList';
 import ArticleFilters from '../components/Articles/ArticleFilters';
 import BulkActionBar from '../components/Articles/BulkActionBar';
 import Pagination from '../components/Common/Pagination';
+import { selectedVisibleIds, toggleAll, toggleId } from '../utils/selection';
 
 const PAGE_SIZE = 20;
 
@@ -47,8 +48,9 @@ export default function Articles() {
     setSelectedIds(new Set());
   }, [page, search, filters]);
 
+  // Resolve against the visible list so stale ids can never be acted on
   const selectedOnPage = useMemo(
-    () => articles.filter((article) => selectedIds.has(article.id)).map((article) => article.id),
+    () => selectedVisibleIds(articles, selectedIds),
     [articles, selectedIds]
   );
 
@@ -88,22 +90,11 @@ export default function Articles() {
   };
 
   const handleToggleSelect = (id) => {
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelectedIds((previous) => toggleId(previous, id));
   };
 
   const handleToggleSelectAll = () => {
-    setSelectedIds((previous) => {
-      const allSelected = articles.length > 0 && articles.every((article) => previous.has(article.id));
-      return allSelected ? new Set() : new Set(articles.map((article) => article.id));
-    });
+    setSelectedIds((previous) => toggleAll(previous, articles.map((article) => article.id)));
   };
 
   const handleClearSelection = () => {

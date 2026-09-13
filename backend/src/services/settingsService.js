@@ -1,5 +1,6 @@
 import { getConnection } from '../database/index.js';
 import logger from '../utils/logger.js';
+import { isRealValue } from '../utils/placeholders.js';
 
 class SettingsService {
   constructor() {
@@ -112,9 +113,16 @@ class SettingsService {
       fromEmail
     } = config;
 
-    // Validate required fields
-    if (!kindleEmail || !smtpHost || !smtpUser || !smtpPassword) {
-      throw new Error('Missing required SMTP fields');
+    // Validate required fields. Placeholder values from .env.example are
+    // rejected so the UI cannot report a working configuration that isn't.
+    const missing = [];
+    if (!isRealValue(kindleEmail)) missing.push('kindleEmail');
+    if (!isRealValue(smtpHost)) missing.push('smtpHost');
+    if (!isRealValue(smtpUser)) missing.push('smtpUser');
+    if (!isRealValue(smtpPassword)) missing.push('smtpPassword');
+
+    if (missing.length > 0) {
+      throw new Error(`Missing or placeholder SMTP fields: ${missing.join(', ')}`);
     }
 
     const updates = [
@@ -136,10 +144,10 @@ class SettingsService {
    */
   isSmtpConfigured() {
     const settings = this.getAll();
-    return !!(settings.KINDLE_EMAIL &&
-              settings.SMTP_HOST &&
-              settings.SMTP_USER &&
-              settings.SMTP_PASSWORD);
+    return isRealValue(settings.KINDLE_EMAIL) &&
+           isRealValue(settings.SMTP_HOST) &&
+           isRealValue(settings.SMTP_USER) &&
+           isRealValue(settings.SMTP_PASSWORD);
   }
 }
 

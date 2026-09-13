@@ -1,8 +1,29 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
 import imageHandler from '../imageHandler.js';
 import fs from 'fs/promises';
+import path from 'path';
 
 describe('ImageHandler', () => {
+  // Some tests download for real, straight into the application images
+  // directory. Record what was already there, then remove anything this suite
+  // creates so a test run never leaves artifacts behind.
+  const imagesDir = path.resolve(imageHandler.baseImagesDir);
+  let preexisting;
+
+  beforeAll(async () => {
+    preexisting = new Set(await fs.readdir(imagesDir).catch(() => []));
+  });
+
+  afterEach(async () => {
+    const entries = await fs.readdir(imagesDir).catch(() => []);
+
+    for (const entry of entries) {
+      if (!preexisting.has(entry)) {
+        await fs.rm(path.join(imagesDir, entry), { recursive: true, force: true });
+      }
+    }
+  });
+
   describe('downloadAndReplaceImages', () => {
     it('should have downloadAndReplaceImages method', () => {
       expect(imageHandler.downloadAndReplaceImages).toBeDefined();
@@ -71,7 +92,7 @@ describe('ImageHandler', () => {
       const mockImg = {
         src: 'https://example.com/image.jpg',
         dataset: null,
-        getAttribute: function(attr) { return null; }
+        getAttribute: function(_attr) { return null; }
       };
 
       const src = imageHandler._getImageSrc(mockImg);
@@ -115,7 +136,7 @@ describe('ImageHandler', () => {
       const mockImg = {
         src: null,
         dataset: null,
-        getAttribute: function(attr) { return null; }
+        getAttribute: function(_attr) { return null; }
       };
 
       const src = imageHandler._getImageSrc(mockImg);
@@ -248,6 +269,15 @@ describe('ImageHandler', () => {
   });
 
   describe('Image path handling', () => {
+    const articleDir = path.join(
+      path.resolve(imageHandler.baseImagesDir),
+      `test-article-${imageHandler._urlHash('https://example.com/article')}`
+    );
+
+    afterEach(async () => {
+      await fs.rm(articleDir, { recursive: true, force: true });
+    });
+
     it('should generate correct image paths with leading slash', async () => {
       const html = '<img src="/test.jpg" alt="Test">';
       const baseUrl = 'https://example.com/article';
@@ -276,6 +306,155 @@ describe('ImageHandler', () => {
       }
 
       // Cleanup mock
+      global.fetch = undefined;
+    });
+  });
+
+  describe('lazy directory creation', () => {
+    const url = 'https://example.com/no-images';
+    const articleDir = path.join(
+      path.resolve(imageHandler.baseImagesDir),
+      `no-images-${imageHandler._urlHash(url)}`
+    );
+
+    afterEach(async () => {
+      await fs.rm(articleDir, { recursive: true, force: true });
+      global.fetch = undefined;
+    });
+
+    it('should not create a directory for an article without images', async () => {
+      const result = await imageHandler.downloadAndReplaceImages(
+        '<p>This article has no images at all.</p>',
+        url,
+        'No Images'
+      );
+
+      expect(result.images).toEqual([]);
+      await expect(fs.access(articleDir)).rejects.toThrow();
+    });
+
+    it('should not create a directory when every image download fails', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({ ok: false, status: 404, statusText: 'Not Found' })
+      );
+
+      const result = await imageHandler.downloadAndReplaceImages(
+        '<img src="/missing.jpg" alt="Missing">',
+        url,
+        'No Images'
+      );
+
+      expect(result.images).toEqual([]);
+      await expect(fs.access(articleDir)).rejects.toThrow();
+    });
+  });
+
+  describe('deleteImageFiles', () => {
+    const imagesDir = path.resolve(imageHandler.baseImagesDir);
+    const testDirName = `__test-cleanup-${process.pid}`;
+    const testDir = path.join(imagesDir, testDirName);
+
+    beforeEach(async () => {
+      await fs.rm(testDir, { recursive: true, force: true });
+      await fs.mkdir(testDir, { recursive: true });
+    });
+
+    afterEach(async () => {
+      await fs.rm(testDir, { recursive: true, force: true });
+    });
+
+    it('should delete recorded files and prune the directory once empty', async () => {
+      const file = path.join(testDir, 'image-0.jpg');
+      await fs.writeFile(file, 'data');
+
+      const removed = await imageHandler.deleteImageFiles([`/images/${testDirName}/image-0.jpg`]);
+
+      expect(removed).toBe(1);
+      await expect(fs.access(file)).rejects.toThrow();
+      await expect(fs.access(testDir)).rejects.toThrow();
+    });
+
+    it('should keep a directory that still holds another article image', async () => {
+      const mine = path.join(testDir, 'image-0.jpg');
+      const other = path.join(testDir, 'image-1.jpg');
+      await fs.writeFile(mine, 'mine');
+      await fs.writeFile(other, 'other');
+
+      const removed = await imageHandler.deleteImageFiles([`/images/${testDirName}/image-0.jpg`]);
+
+      expect(removed).toBe(1);
+      await expect(fs.access(other)).resolves.toBeUndefined();
+      await expect(fs.access(testDir)).resolves.toBeUndefined();
+    });
+
+    it('should tolerate files that are already gone', async () => {
+      const removed = await imageHandler.deleteImageFiles([`/images/${testDirName}/missing.jpg`]);
+      expect(removed).toBe(0);
+    });
+
+    it('should refuse to delete anything outside the images directory', async () => {
+      const outside = path.join(imagesDir, '..', `__outside-${process.pid}.txt`);
+      await fs.writeFile(outside, 'must survive');
+
+      const removed = await imageHandler.deleteImageFiles([
+        `/images/../../${path.basename(outside)}`,
+        '/etc/passwd',
+        'images/no-leading-slash.jpg',
+        '/images/'
+      ]);
+
+      expect(removed).toBe(0);
+      await expect(fs.access(outside)).resolves.toBeUndefined();
+
+      await fs.rm(outside, { force: true });
+    });
+  });
+
+  describe('image directory naming', () => {
+    const imagesDir = path.resolve(imageHandler.baseImagesDir);
+    const firstUrl = 'https://example.com/article';
+    const secondUrl = 'https://example.com/another-article';
+
+    const dirFor = (url) => path.join(imagesDir, `shared-title-${imageHandler._urlHash(url)}`);
+
+    afterEach(async () => {
+      await fs.rm(dirFor(firstUrl), { recursive: true, force: true });
+      await fs.rm(dirFor(secondUrl), { recursive: true, force: true });
+    });
+
+    it('should derive a stable per-URL hash', () => {
+      const hash = imageHandler._urlHash(firstUrl);
+
+      expect(hash).toHaveLength(10);
+      expect(imageHandler._urlHash(firstUrl)).toBe(hash);
+      expect(imageHandler._urlHash(secondUrl)).not.toBe(hash);
+    });
+
+    it('should isolate two articles that share the same title', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          headers: {
+            get: (header) => {
+              if (header === 'content-type') return 'image/jpeg';
+              if (header === 'content-length') return '1000';
+              return null;
+            }
+          },
+          arrayBuffer: () => Promise.resolve(new ArrayBuffer(1000))
+        })
+      );
+
+      const html = '<img src="/test.jpg" alt="Test">';
+      const first = await imageHandler.downloadAndReplaceImages(html, firstUrl, 'Shared Title');
+      const second = await imageHandler.downloadAndReplaceImages(html, secondUrl, 'Shared Title');
+
+      expect(first.images).toHaveLength(1);
+      expect(second.images).toHaveLength(1);
+      expect(first.images[0].localPath).toContain(`/images/shared-title-${imageHandler._urlHash(firstUrl)}/`);
+      expect(second.images[0].localPath).toContain(`/images/shared-title-${imageHandler._urlHash(secondUrl)}/`);
+      expect(first.images[0].localPath).not.toBe(second.images[0].localPath);
+
       global.fetch = undefined;
     });
   });

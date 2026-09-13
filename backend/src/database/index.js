@@ -4,6 +4,7 @@ import fs from 'fs';
 
 import { getConfig } from '../config.js';
 import logger from '../utils/logger.js';
+import { restrictFilePermissions } from '../utils/filePermissions.js';
 
 
 
@@ -27,6 +28,11 @@ export function getConnection() {
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+
+    // The settings table stores the SMTP password in plaintext
+    restrictFilePermissions(dbPath);
+    restrictFilePermissions(`${dbPath}-wal`);
+    restrictFilePermissions(`${dbPath}-shm`);
 
     logger.info('Database connection established', { path: dbPath });
   }

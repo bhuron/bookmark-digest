@@ -1,6 +1,7 @@
 import pkg from 'express-validator';
 const { body, param, query, validationResult } = pkg;
 import logger from '../utils/logger.js';
+import { getMaxArticleBytes, getMaxArticleMb } from '../config.js';
 
 /**
  * Validation middleware
@@ -30,8 +31,9 @@ export const validationRules = {
     body('html')
       .notEmpty()
       .withMessage('HTML content is required')
-      .isLength({ max: 10000000 })
-      .withMessage('HTML content too large (max 10MB)'),
+      // Read the limit per request so MAX_ARTICLE_SIZE_MB is actually honoured
+      .custom((value) => typeof value !== 'string' || value.length <= getMaxArticleBytes())
+      .withMessage(() => `HTML content too large (max ${getMaxArticleMb()} MB)`),
     body('url')
       .isURL()
       .withMessage('Valid URL is required')

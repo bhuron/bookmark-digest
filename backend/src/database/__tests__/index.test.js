@@ -1,4 +1,4 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
 import { getConnection, closeConnection, initializeDatabase } from '../index.js';
@@ -18,7 +18,7 @@ describe('Database Operations', () => {
       if (fs.existsSync(testDbPath)) {
         fs.unlinkSync(testDbPath);
       }
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -59,7 +59,7 @@ describe('Database Operations', () => {
         fs.rmSync(testDir, { recursive: true, force: true });
       }
 
-      const db = getConnection();
+      getConnection();
 
       expect(fs.existsSync(testDir)).toBe(true);
 

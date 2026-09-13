@@ -63,8 +63,18 @@ router.put('/',
     });
 
     // Save to database
-    const success = settingsService.setSmtpSettings(smtpConfig);
-    
+    let success;
+
+    try {
+      success = settingsService.setSmtpSettings(smtpConfig);
+    } catch (error) {
+      // Invalid or placeholder values are the caller's problem, not a server fault
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+
     if (!success) {
       throw new Error('Failed to save SMTP settings');
     }

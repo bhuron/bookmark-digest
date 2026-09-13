@@ -1,4 +1,4 @@
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import articleProcessor from '../articleProcessor.js';
 
 describe('ArticleProcessor', () => {

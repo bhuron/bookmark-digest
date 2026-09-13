@@ -63,7 +63,6 @@ export default function EPUB() {
   });
 
   const articles = articlesData?.data?.articles || [];
-  const _totalArticles = articlesData?.data?.total || 0;
   const exports = exportsData || [];
 
   const toggleArticleSelection = (articleId) => {

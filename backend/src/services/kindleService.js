@@ -5,6 +5,7 @@ import path from 'path';
 import logger from '../utils/logger.js';
 import { getConfig } from '../config.js';
 import { getConnection } from '../database/index.js';
+import { isRealValue } from '../utils/placeholders.js';
 
 
 
@@ -67,9 +68,18 @@ class KindleService {
       fromEmail: getConfig('FROM_EMAIL')
     };
 
-    // Check if required fields are present
-    if (!config.kindleEmail || !config.smtpHost || !config.smtpUser || !config.smtpPassword) {
-      logger.warn('Kindle service not fully configured - missing required fields');
+    // Check that required fields are present and are not the placeholder
+    // values shipped in .env.example
+    const missing = [];
+    if (!isRealValue(config.kindleEmail)) missing.push('KINDLE_EMAIL');
+    if (!isRealValue(config.smtpHost)) missing.push('SMTP_HOST');
+    if (!isRealValue(config.smtpUser)) missing.push('SMTP_USER');
+    if (!isRealValue(config.smtpPassword)) missing.push('SMTP_PASSWORD');
+
+    if (missing.length > 0) {
+      logger.warn('Kindle service not fully configured', {
+        missingOrPlaceholder: missing
+      });
       return false;
     }
 

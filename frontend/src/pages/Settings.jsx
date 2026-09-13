@@ -26,7 +26,7 @@ export default function Settings() {
     enabled: !!localStorage.getItem('bookmark_digest_api_key'),
   });
 
-  const { data: _settings } = useQuery({
+  useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
       const response = await settingsApi.get();
@@ -443,11 +443,11 @@ export default function Settings() {
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">2</span>
-                <span className="pt-0.5">Enable "Developer mode" in the top right corner</span>
+                <span className="pt-0.5">Enable &ldquo;Developer mode&rdquo; in the top right corner</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">3</span>
-                <span className="pt-0.5">Click "Load unpacked" and select the <code className="bg-gallery-100 px-2 py-0.5 rounded text-sm font-mono">extension</code> folder</span>
+                <span className="pt-0.5">Click &ldquo;Load unpacked&rdquo; and select the <code className="bg-gallery-100 px-2 py-0.5 rounded text-sm font-mono">extension</code> folder</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gallery-900 text-white flex items-center justify-center text-xs font-bold">4</span>

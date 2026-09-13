@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -34,16 +35,28 @@ class ImageHandler {
     const images = doc.querySelectorAll('img');
     const downloadedImages = [];
 
-    // Create safe filename for article directory
-    const safeTitle = this._sanitizeFilename(articleTitle);
-    const articleDir = path.join(this.baseImagesDir, safeTitle);
+    // Directory is keyed by title for readability plus a hash of the article URL
+    // for uniqueness: two articles can share a title, and a title can change.
+    const safeTitle = this._sanitizeFilename(articleTitle) || 'article';
+    const articleDir = path.join(this.baseImagesDir, `${safeTitle}-${this._urlHash(baseUrl)}`);
 
-    try {
-      await fs.mkdir(articleDir, { recursive: true });
-      logger.debug('Created article image directory', { path: articleDir });
-    } catch (error) {
-      logger.error('Failed to create image directory', { error: error.message });
+    if (!this._isInsideBaseImagesDir(articleDir)) {
+      logger.error('Refusing to write images outside the images directory', {
+        path: articleDir
+      });
       return { html, images: [] };
+    }
+
+    // Drop files left behind by a previous capture of the same URL. The
+    // directory itself is created lazily in _downloadImage, so an article with
+    // no downloadable images never leaves an empty directory behind.
+    try {
+      await fs.rm(articleDir, { recursive: true, force: true });
+    } catch (error) {
+      logger.warn('Failed to clear previous image directory', {
+        path: articleDir,
+        error: error.message
+      });
     }
 
     // Process each image
@@ -184,7 +197,9 @@ class ImageHandler {
     const filename = `image-${index}-${Date.now()}.${ext}`;
     const localPath = path.join(articleDir, filename);
 
-    // Save to disk
+    // Create the article directory only once an image is actually ready to be
+    // written, so captures without images leave nothing behind on disk
+    await fs.mkdir(articleDir, { recursive: true });
     await fs.writeFile(localPath, optimizedBuffer);
 
     // Return absolute path for web display (will be served at /images/)
@@ -224,6 +239,98 @@ class ImageHandler {
       logger.warn('Failed to optimize image, using original', { error: error.message });
       return buffer;
     }
+  }
+
+  /**
+   * Stable short hash of the article URL, used to keep image directories unique
+   */
+  _urlHash(url) {
+    return crypto.createHash('sha256').update(String(url || '')).digest('hex').slice(0, 10);
+  }
+
+  /**
+   * Check that a target path resolves inside the images directory
+   */
+  _isInsideBaseImagesDir(target) {
+    const base = path.resolve(this.baseImagesDir);
+    const resolved = path.resolve(target);
+    return resolved === base || resolved.startsWith(base + path.sep);
+  }
+
+  /**
+   * Map a stored `/images/...` path to an absolute path, rejecting anything that
+   * would escape the images directory.
+   * @param {string} localPath - Stored local path, e.g. `/images/dir/file.jpg`
+   * @returns {string|null} - Absolute path, or null when unsafe or malformed
+   */
+  _resolveLocalImagePath(localPath) {
+    if (typeof localPath !== 'string' || !localPath.startsWith('/images/')) {
+      return null;
+    }
+
+    const relative = localPath.slice('/images/'.length);
+    const segments = relative.split('/');
+
+    // Reject empty, current, and parent segments outright
+    if (segments.some(segment => segment === '' || segment === '.' || segment === '..')) {
+      return null;
+    }
+
+    const base = path.resolve(this.baseImagesDir);
+    const resolved = path.resolve(this.baseImagesDir, relative);
+
+    // Must be a file inside the images directory, never the directory itself
+    return resolved.startsWith(base + path.sep) ? resolved : null;
+  }
+
+  /**
+   * Delete image files belonging to deleted articles.
+   *
+   * Best-effort: the database rows are already gone by the time this runs, so
+   * failures are logged rather than thrown. Only files recorded for those
+   * articles are removed, which keeps a directory shared with another article
+   * intact.
+   *
+   * @param {string[]} localPaths - Stored `/images/...` paths
+   * @returns {Promise<number>} - Number of files actually removed
+   */
+  async deleteImageFiles(localPaths = []) {
+    let removed = 0;
+    const directories = new Set();
+
+    for (const localPath of localPaths) {
+      const absolutePath = this._resolveLocalImagePath(localPath);
+
+      if (!absolutePath) {
+        logger.warn('Refusing to delete image outside the images directory', { localPath });
+        continue;
+      }
+
+      try {
+        await fs.unlink(absolutePath);
+        removed += 1;
+        directories.add(path.dirname(absolutePath));
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          logger.warn('Failed to delete image file', { localPath, error: error.message });
+        }
+      }
+    }
+
+    // Prune directories that are now empty. Never recursive: a directory could
+    // still hold images belonging to another article.
+    for (const directory of directories) {
+      try {
+        const entries = await fs.readdir(directory);
+        if (entries.length === 0) {
+          await fs.rmdir(directory);
+        }
+      } catch {
+        // Already gone, or not removable - nothing to do
+      }
+    }
+
+    return removed;
   }
 
   /**

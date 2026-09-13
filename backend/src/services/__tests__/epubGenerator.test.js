@@ -1,7 +1,5 @@
-import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import epubGenerator from '../epubGenerator.js';
-import fs from 'fs/promises';
-import path from 'path';
 
 describe('EPUBGenerator', () => {
   describe('listExports', () => {

@@ -1,5 +1,6 @@
 import express from 'express';
 import articleProcessor from '../services/articleProcessor.js';
+import imageHandler from '../services/imageHandler.js';
 import { validateRequest, validationRules } from '../middleware/validation.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { articleCreationLimiter } from '../middleware/rateLimiter.js';
@@ -7,6 +8,35 @@ import { getConnection } from '../database/index.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+/**
+ * Delete articles by ID and remove their image files from disk.
+ * Shared by the single and bulk delete endpoints so both stay in step.
+ *
+ * @param {number[]} ids - Article IDs to delete
+ * @returns {Promise<{deleted: number, imagesRemoved: number, imageCount: number}>}
+ */
+async function deleteArticlesByIds(ids) {
+  const db = getConnection();
+  const placeholders = ids.map(() => '?').join(', ');
+
+  // Collect image paths before the rows are removed by ON DELETE CASCADE
+  const imagePaths = db
+    .prepare(`SELECT local_path FROM article_images WHERE article_id IN (${placeholders})`)
+    .all(...ids)
+    .map(row => row.local_path);
+
+  const deleteStmt = db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`);
+
+  // Single transaction: the whole batch succeeds or nothing is deleted
+  const deleted = db.transaction(() => deleteStmt.run(...ids).changes)();
+
+  // Filesystem cleanup is best-effort: the rows are already gone and a failed
+  // unlink must not fail the request
+  const imagesRemoved = await imageHandler.deleteImageFiles(imagePaths);
+
+  return { deleted, imagesRemoved, imageCount: imagePaths.length };
+}
 
 /**
  * POST /api/articles
@@ -288,20 +318,15 @@ router.delete('/bulk',
   asyncHandler(async (req, res) => {
     // Deduplicate so the reported counts stay accurate
     const ids = [...new Set(req.body.ids.map(Number))];
-    const db = getConnection();
 
-    const placeholders = ids.map(() => '?').join(', ');
-    const deleteStmt = db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`);
-
-    // Single transaction: the whole batch succeeds or nothing is deleted.
-    // article_images rows are removed by the ON DELETE CASCADE foreign key.
-    const deleted = db.transaction(() => deleteStmt.run(...ids).changes)();
+    const { deleted, imagesRemoved } = await deleteArticlesByIds(ids);
     const notFound = ids.length - deleted;
 
     logger.info('Articles bulk deleted', {
       requested: ids.length,
       deleted,
-      notFound
+      notFound,
+      imagesRemoved
     });
 
     res.json({
@@ -309,6 +334,7 @@ router.delete('/bulk',
       requested: ids.length,
       deleted,
       notFound,
+      imagesRemoved,
       message: `${deleted} article${deleted === 1 ? '' : 's'} deleted`
     });
   })
@@ -323,18 +349,18 @@ router.delete('/:id',
   validateRequest,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const db = getConnection();
+    const articleId = Number(id);
 
-    const result = db.prepare('DELETE FROM articles WHERE id = ?').run(id);
+    const { deleted, imagesRemoved } = await deleteArticlesByIds([articleId]);
 
-    if (result.changes === 0) {
+    if (deleted === 0) {
       return res.status(404).json({
         error: 'Not Found',
         message: 'Article not found'
       });
     }
 
-    logger.info('Article deleted', { articleId: id });
+    logger.info('Article deleted', { articleId, imagesRemoved });
 
     res.json({
       success: true,

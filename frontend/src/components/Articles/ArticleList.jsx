@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ArticleCard from './ArticleCard';
+import { isAllSelected, isPartiallySelected, selectedVisibleIds } from '../../utils/selection';
 
 export default function ArticleList({
   articles = [],
@@ -12,11 +13,9 @@ export default function ArticleList({
   const selectAllRef = useRef(null);
 
   const selectable = Boolean(onToggleSelect) && Boolean(selectedIds);
-  const selectedCount = selectable
-    ? articles.filter((article) => selectedIds.has(article.id)).length
-    : 0;
-  const allSelected = articles.length > 0 && selectedCount === articles.length;
-  const someSelected = selectedCount > 0 && !allSelected;
+  const selectedCount = selectable ? selectedVisibleIds(articles, selectedIds).length : 0;
+  const allSelected = selectable && isAllSelected(articles, selectedIds);
+  const someSelected = selectable && isPartiallySelected(articles, selectedIds);
 
   // "Indeterminate" is a DOM-only property, so it can't be set via JSX
   useEffect(() => {

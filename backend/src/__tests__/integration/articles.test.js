@@ -12,6 +12,9 @@ jest.mock('../../middleware/rateLimiter.js', () => ({
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import request from 'supertest';
+import fs from 'fs/promises';
+import path from 'path';
+import imageHandler from '../../services/imageHandler.js';
 import {
   createTestApp,
   setupTestDatabase,
@@ -390,6 +393,33 @@ describe('Articles API Integration Tests', () => {
         .set(createAuthHeaders());
 
       expect(getResponse.status).toBe(404);
+    });
+
+    it('should remove the article image files from disk', async () => {
+      const { getConnection } = await import('../../database/index.js');
+      const db = getConnection();
+
+      const dirName = `__test-integration-${process.pid}`;
+      const dir = path.join(path.resolve(imageHandler.baseImagesDir), dirName);
+      const file = path.join(dir, 'image-0.jpg');
+
+      try {
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(file, 'data');
+
+        db.prepare(
+          'INSERT INTO article_images (article_id, original_url, local_path) VALUES (?, ?, ?)'
+        ).run(articleId, 'https://example.com/a.jpg', `/images/${dirName}/image-0.jpg`);
+
+        const response = await request(app)
+          .delete(`/api/articles/${articleId}`)
+          .set(createAuthHeaders());
+
+        expect(response.status).toBe(200);
+        await expect(fs.access(file)).rejects.toThrow();
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
     });
 
     it('should return 404 for non-existent article', async () => {
