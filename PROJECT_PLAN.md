@@ -859,7 +859,6 @@ NODE_ENV=development
 
 # Database
 DB_PATH=./data/bookmark-digest.db
-DATA_DIR=./data
 EPUB_EXPORT_DIR=./epub-exports
 
 # Image Handling

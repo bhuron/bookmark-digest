@@ -311,21 +311,14 @@ rm config.json
 cd backend && npm start
 ```
 
-## Development
+## Continuous Integration
 
-```bash
-# Install dependencies
-npm install
+`.github/workflows/ci.yml` runs the same checks on every push and pull request to `master`:
 
-# Run in development mode with auto-reload
-npm run dev
+- **Backend** — `npm run lint`, `npm test`
+- **Frontend** — `npm run lint`, `npm run test:run`, `npm run build`
 
-# Run tests
-npm test
-
-# Migrate database
-npm run migrate
-```
+Reproduce them locally with `npm run lint && npm test` in `backend/`, and `npm run lint && npm run test:run` in `frontend/`.
 
 ## Contributing
 

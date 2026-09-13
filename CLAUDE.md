@@ -98,6 +98,7 @@ backend/src/
 frontend/src/
 ├── main.jsx              # React entry point
 ├── App.jsx               # Root app with router
+├── index.css             # Tailwind layers and component classes
 ├── components/
 │   ├── Layout/
 │   │   ├── Header.jsx    # App header with navigation
@@ -108,23 +109,20 @@ frontend/src/
 │   │   ├── ArticleViewer.jsx  # Full article content viewer
 │   │   ├── ArticleFilters.jsx  # Filter controls
 │   │   └── BulkActionBar.jsx  # Selection count + bulk delete actions
-│   ├── Common/
-│   │   ├── SearchBar.jsx   # Search input
-│   │   ├── Pagination.jsx   # Pagination controls
-│   │   └── LoadingSpinner.jsx
-│   └── EPUB/
-│       ├── EPUBGenerator.jsx   # EPUB generation UI
-│       ├── ExportHistory.jsx   # Export list
-│       └── KindleSettings.jsx  # SMTP configuration
+│   └── Common/
+│       ├── SearchBar.jsx     # Search input
+│       ├── Pagination.jsx    # Pagination controls
+│       └── LoadingSpinner.jsx
 ├── pages/
-│   ├── Articles.jsx       # Articles list page
-│   ├── EPUB.jsx           # EPUB generation page
-│   └── Settings.jsx       # App settings
-├── hooks/
-│   ├── useArticles.js     # Articles API hook (TanStack Query)
-│   └── useEPUB.js         # EPUB API hook
-└── services/
-    └── api.js             # Axios client with auth
+│   ├── Articles.jsx      # Articles list page
+│   ├── EPUB.jsx          # EPUB generation page
+│   └── Settings.jsx      # App settings (API key + SMTP/Kindle form)
+├── services/
+│   └── api.js            # Axios client with auth
+└── utils/
+    ├── cn.js             # clsx wrapper
+    ├── format.js         # Date and reading-time formatting
+    └── selection.js      # Article selection helpers (unit tested)
 ```
 
 ### Article Processing Pipeline
@@ -230,9 +228,11 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 - Connection is singleton - always get via `getConnection()`
 
 ### Image Handling
-- Images are stored locally under `./data/images/{articleId}/`
-- URLs in article HTML are replaced with local paths
+- Images are stored under `backend/images/<title-slug>-<url-hash>/` and served at `/images/...`
+- The directory name includes a hash of the article URL, so two articles with the same title cannot collide
+- URLs in article HTML are replaced with local paths recorded in `article_images`
 - If image download fails, article is still saved (images skipped)
+- Deleting articles removes their recorded image files and prunes directories left empty; every path is validated to stay inside the images directory
 
 ### Reading Time Calculation
 - Based on 200 words per minute average
@@ -270,15 +270,16 @@ The browser extension is **fully implemented** in the `/extension` directory.
 - SQLite connection uses WAL mode for better concurrency
 - All dates stored as ISO strings in SQLite, converted to Date objects in JS
 - EPUB library uses `@lesjoursfr/html-to-epub` - EPUB 3.3 compliant, validated with epubcheck
-- Images stored locally in `./data/images/{articleId}/` with leading slashes for proper path resolution
+- Images stored locally in `backend/images/<title-slug>-<url-hash>/` with leading slashes for proper path resolution
 - **JSDOM VirtualConsole** is used to suppress CSS parsing errors from malformed HTML
 
 ## Frontend Architecture
 
 ### State Management
 - **TanStack Query (React Query)** for server state management
-- Custom hooks in `hooks/` directory encapsulate API calls
+- Data fetching lives inline in the page components via `useQuery`/`useMutation`; there is no `hooks/` directory
 - No global state library - use React state and TanStack Query's cache
+- Pure, testable logic lives in `utils/` (see `utils/selection.js`)
 
 ### Styling
 - **Tailwind CSS** for utility-first styling
@@ -298,13 +299,13 @@ The browser extension is **fully implemented** in the `/extension` directory.
 - Mock external dependencies (SMTP, image downloads)
 
 ### Frontend Tests (Vitest)
-- Run with: `npm test` (in `/frontend` directory)
-- Component tests with React Testing Library
-- API tests with mocked Axios
+- Run with: `npm test` (watch) or `npm run test:run` (single pass) in `/frontend`
+- Currently pure unit tests under `src/utils/`; React Testing Library is not installed, so there are no component tests yet
 
 ### Test Status
-- **Partial:** Test infrastructure set up but most tests not yet written
-- See STATUS.md for current test coverage
+- Backend: 9 Jest suites (routes, services, database, config, integration)
+- Frontend: pure unit tests for `utils/selection.js`; no component tests yet
+- CI (`.github/workflows/ci.yml`) runs lint + tests on every push and pull request
 
 ## Common Patterns
 
@@ -327,7 +328,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 **Adding a new frontend page:**
 1. Create component in `frontend/src/pages/`
 2. Add route in `App.jsx`
-3. Create custom hook in `hooks/` for API calls
+3. Add the API call to `services/api.js` and fetch it with `useQuery` in the page
 4. Add navigation link in `Header.jsx`
 
 ## Known Issues & Limitations
