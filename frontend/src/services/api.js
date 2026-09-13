@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { clearApiKey, getApiKey } from '../utils/apiKey';
+import { clearApiKey, getApiKey, readSentApiKey } from '../utils/apiKey';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
@@ -24,8 +24,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear invalid API key
-      clearApiKey();
+      // Only forget a key that was actually sent and rejected. Clearing when no
+      // key was sent would delete the host-wide cookie, which is shared with the
+      // other port, and break a setup that was working there.
+      if (readSentApiKey(error.config)) {
+        clearApiKey();
+      }
+
       window.location.href = '/settings';
     }
     return Promise.reject(error);

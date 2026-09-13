@@ -6,6 +6,7 @@ import {
   getApiKey,
   hasApiKey,
   parseApiKeyFromCookie,
+  readSentApiKey,
   setApiKey,
 } from './apiKey';
 
@@ -135,5 +136,24 @@ describe('clearApiKey', () => {
 
     expect(store.has(API_KEY_STORAGE_KEY)).toBe(false);
     expect(document.cookie).toContain('max-age=0');
+  });
+});
+
+describe('readSentApiKey', () => {
+  it('should read plain object headers', () => {
+    expect(readSentApiKey({ headers: { 'X-API-Key': 'abc123' } })).toBe('abc123');
+  });
+
+  it('should read an AxiosHeaders instance', () => {
+    const headers = { get: (name) => (name === 'X-API-Key' ? 'abc123' : undefined) };
+
+    expect(readSentApiKey({ headers })).toBe('abc123');
+  });
+
+  it('should return empty when the request carried no key', () => {
+    // This is the case that must not clear a valid shared cookie
+    expect(readSentApiKey({ headers: {} })).toBe('');
+    expect(readSentApiKey({})).toBe('');
+    expect(readSentApiKey(undefined)).toBe('');
   });
 });

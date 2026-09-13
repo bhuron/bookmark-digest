@@ -116,6 +116,25 @@ export function setApiKey(value) {
 }
 
 /**
+ * Read the API key that a failed request actually carried.
+ *
+ * axios headers are sometimes an AxiosHeaders instance and sometimes a plain
+ * object, so both shapes are handled.
+ *
+ * @param {Object} config - axios request config from an error
+ * @returns {string} - The key that was sent, or ''
+ */
+export function readSentApiKey(config) {
+  const headers = config?.headers;
+
+  if (!headers) {
+    return '';
+  }
+
+  return (typeof headers.get === 'function' ? headers.get('X-API-Key') : headers['X-API-Key']) || '';
+}
+
+/**
  * Forget the API key everywhere.
  */
 export function clearApiKey() {
