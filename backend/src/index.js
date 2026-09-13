@@ -3,9 +3,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getArticleBodyLimit, getConfig } from './config.js';
+import { getArticleBodyLimit, getConfig, validateConfig } from './config.js';
 import logger from './utils/logger.js';
+import { isSpaRoute } from './utils/spaRoutes.js';
 import { validateApiKey } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -23,6 +25,15 @@ import settingsRouter from './routes/settings.js';
 // Import services
 import kindleService from './services/kindleService.js';
 import settingsService from './services/settingsService.js';
+
+// Validate configuration before serving anything, so a typo in .env fails
+// loudly at boot instead of silently falling back to a default
+try {
+  validateConfig();
+} catch (error) {
+  console.error(`\n✗ ${error.message}\n`);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = getConfig('PORT', 3000);
@@ -89,6 +100,40 @@ app.get('/api/status', validateApiKey, (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Serve the built frontend when it exists, so a production install runs as a
+// single process on one port. Development uses the Vite dev server instead, so
+// this is skipped until the frontend has been built.
+const frontendDist = path.join(__dirname, '../../frontend/dist');
+const frontendIndex = path.join(frontendDist, 'index.html');
+
+if (fs.existsSync(frontendIndex)) {
+  app.use(express.static(frontendDist, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html')) {
+        // The shell must be revalidated, or clients pin an old bundle
+        res.setHeader('Cache-Control', 'no-cache');
+      } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        // Vite fingerprints asset filenames, so those can be cached hard
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
+
+  // Client-side routes fall back to the shell; server paths keep their JSON 404
+  app.get('*', (req, res, next) => {
+    if (!isSpaRoute(req.path)) {
+      return next();
+    }
+
+    res.sendFile(frontendIndex);
+  });
+
+  logger.info('Serving built frontend', { path: frontendDist });
+} else {
+  logger.info('No frontend build found - run "npm run build" in frontend/ to serve the UI from this server');
+}
 
 // 404 handler
 app.use(notFoundHandler);

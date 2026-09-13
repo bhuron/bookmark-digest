@@ -64,6 +64,9 @@ npm test -- --watch
 ### API Authentication
 All API endpoints (except `/health`) require an API key sent via `X-API-Key` header. The API key is auto-generated on first run and stored in `config.json` at the repository root.
 
+### Serving the frontend
+In production the backend serves `frontend/dist` itself - one process, one port, no CORS hop - with a fallback to `index.html` for client-side routes. `utils/spaRoutes.js` keeps that fallback away from `/api`, `/health` and `/images` so those keep returning JSON. Static serving is skipped when no build exists, which is the normal development case; run `npm run build` (root) to enable it.
+
 ### Backend Structure
 
 ```
@@ -75,7 +78,9 @@ backend/src/
 │   └── migrations.js     # Migration runner (applies files from /migrations)
 ├── services/
 │   ├── articleProcessor.js  # Readability extraction + HTML sanitization
-│   ├── imageHandler.js      # Image downloading and local storage
+│   ├── articleService.js    # Article reads/writes and delete (owns the SQL)
+│   ├── imageHandler.js      # Image downloading, local storage and cleanup
+│   ├── coverGenerator.js    # EPUB cover image generation (sharp)
 │   ├── epubGenerator.js     # EPUB generation from articles
 │   ├── kindleService.js     # Email delivery via nodemailer
 │   └── settingsService.js   # Application settings management
@@ -184,6 +189,8 @@ Copy the template to the **repository root** (not `backend/`):
 ```bash
 cp backend/.env.example .env
 ```
+
+Values are validated at boot by `validateConfig()` in `config.js`. An unset variable falls back to its default, but a value that is present and invalid (non-numeric `PORT`, out-of-range `IMAGE_QUALITY`, an unknown `NODE_ENV`, ...) aborts startup with every problem listed at once. The real process environment wins over `.env`, because dotenv never overwrites an existing variable - so `PORT=4000 npm start`, or a pm2 `env` block, overrides the file.
 
 Key environment variables (see `backend/.env.example`):
 
@@ -303,7 +310,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 - Currently pure unit tests under `src/utils/`; React Testing Library is not installed, so there are no component tests yet
 
 ### Test Status
-- Backend: 9 Jest suites (routes, services, database, config, integration)
+- Backend: 10 Jest suites (routes, services, database, config, utils, integration)
 - Frontend: pure unit tests for `utils/selection.js`; no component tests yet
 - CI (`.github/workflows/ci.yml`) runs lint + tests on every push and pull request
 

@@ -103,6 +103,21 @@ API_KEY=$(node -e "console.log(require('./config.json').apiKey)")
 curl -H "X-API-Key: $API_KEY" http://localhost:3001/api/status
 ```
 
+## Production (single process)
+
+The backend also serves the built frontend, so a production install is one process on one port:
+
+```bash
+npm run build     # build frontend/ into frontend/dist
+npm start         # pm2 starts backend/, serving the API and the UI on :3001
+```
+
+The web UI is then at `http://localhost:3001` — there is no separate frontend server and no CORS hop,
+because the UI and the API share an origin. `npm start` needs pm2 (a root devDependency), so run
+`npm install` at the repository root once. If `frontend/dist` is missing, the backend skips static
+serving and logs a hint; that is the normal state during development, where the Vite dev server runs
+on `:5174` instead.
+
 ## API Key Authentication
 
 All `/api/*` endpoints require an API key sent via the `X-API-Key` header:
