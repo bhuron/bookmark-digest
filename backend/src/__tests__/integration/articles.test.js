@@ -401,6 +401,128 @@ describe('Articles API Integration Tests', () => {
     });
   });
 
+  describe('DELETE /api/articles/bulk', () => {
+    const seedArticles = async (count) => {
+      const ids = [];
+
+      for (let n = 1; n <= count; n += 1) {
+        const response = await request(app)
+          .post('/api/articles')
+          .set(createAuthHeaders())
+          .send({
+            html: `<html><body><article><h1>Bulk Delete ${n}</h1><p>Content for bulk delete test number ${n} with sufficient text.</p></article></body></html>`,
+            url: `https://example.com/bulk-delete-${n}`
+          });
+
+        ids.push(response.body.article.id);
+      }
+
+      return ids;
+    };
+
+    it('should require authentication', async () => {
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .send({ ids: [1, 2] });
+
+      expect(response.status).toBe(401);
+    });
+
+    it('should delete multiple articles and leave the rest untouched', async () => {
+      const ids = await seedArticles(3);
+
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: [ids[0], ids[1]] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        success: true,
+        requested: 2,
+        deleted: 2,
+        notFound: 0
+      });
+
+      const remaining = await request(app)
+        .get('/api/articles')
+        .set(createAuthHeaders());
+
+      expect(remaining.body.data.total).toBe(1);
+      expect(remaining.body.data.articles[0].id).toBe(ids[2]);
+    });
+
+    it('should report non-existent IDs without failing the request', async () => {
+      const ids = await seedArticles(1);
+
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: [ids[0], 999999] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        requested: 2,
+        deleted: 1,
+        notFound: 1
+      });
+    });
+
+    it('should ignore duplicate IDs', async () => {
+      const ids = await seedArticles(1);
+
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: [ids[0], ids[0], ids[0]] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ requested: 1, deleted: 1 });
+    });
+
+    it('should not be shadowed by the /:id route', async () => {
+      // Regression guard: /bulk must reach the bulk handler instead of being
+      // parsed as an article ID (which would fail ID validation with a 400)
+      const ids = await seedArticles(1);
+
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('deleted', 1);
+    });
+
+    it('should reject an empty ids array', async () => {
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: [] });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('error');
+    });
+
+    it('should reject a non-array ids payload', async () => {
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: 5 });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should reject non-integer ids', async () => {
+      const response = await request(app)
+        .delete('/api/articles/bulk')
+        .set(createAuthHeaders())
+        .send({ ids: ['abc', 2] });
+
+      expect(response.status).toBe(400);
+    });
+  });
+
   describe('GET /api/articles/stats', () => {
     beforeEach(async () => {
       // Create test articles with different states

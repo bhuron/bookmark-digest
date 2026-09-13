@@ -278,6 +278,43 @@ router.put('/:id',
 );
 
 /**
+ * DELETE /api/articles/bulk
+ * Delete multiple articles in a single transaction
+ * Must be registered before DELETE /:id so "bulk" is not matched as an ID
+ */
+router.delete('/bulk',
+  validationRules.bulkDeleteArticles,
+  validateRequest,
+  asyncHandler(async (req, res) => {
+    // Deduplicate so the reported counts stay accurate
+    const ids = [...new Set(req.body.ids.map(Number))];
+    const db = getConnection();
+
+    const placeholders = ids.map(() => '?').join(', ');
+    const deleteStmt = db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`);
+
+    // Single transaction: the whole batch succeeds or nothing is deleted.
+    // article_images rows are removed by the ON DELETE CASCADE foreign key.
+    const deleted = db.transaction(() => deleteStmt.run(...ids).changes)();
+    const notFound = ids.length - deleted;
+
+    logger.info('Articles bulk deleted', {
+      requested: ids.length,
+      deleted,
+      notFound
+    });
+
+    res.json({
+      success: true,
+      requested: ids.length,
+      deleted,
+      notFound,
+      message: `${deleted} article${deleted === 1 ? '' : 's'} deleted`
+    });
+  })
+);
+
+/**
  * DELETE /api/articles/:id
  * Delete article
  */

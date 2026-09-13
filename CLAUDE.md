@@ -102,10 +102,11 @@ frontend/src/
 │   │   ├── Header.jsx    # App header with navigation
 │   │   └── Layout.jsx    # Main layout wrapper
 │   ├── Articles/
-│   │   ├── ArticleList.jsx    # Article list container
-│   │   ├── ArticleCard.jsx    # Single article card
+│   │   ├── ArticleList.jsx    # Article list container + select-all header
+│   │   ├── ArticleCard.jsx    # Single article card (with selection checkbox)
 │   │   ├── ArticleViewer.jsx  # Full article content viewer
-│   │   └── ArticleFilters.jsx  # Filter controls
+│   │   ├── ArticleFilters.jsx  # Filter controls
+│   │   └── BulkActionBar.jsx  # Selection count + bulk delete actions
 │   ├── Common/
 │   │   ├── SearchBar.jsx   # Search input
 │   │   ├── Pagination.jsx   # Pagination controls
@@ -159,6 +160,7 @@ frontend/src/
 - `GET /api/articles/:id` - Get single article
 - `PUT /api/articles/:id` - Update `{ title?, is_archived?, is_favorite? }`
 - `DELETE /api/articles/:id` - Delete article
+- `DELETE /api/articles/bulk` - Delete many articles in one transaction `{ ids: [] }` (max 500)
 - `GET /api/articles/stats` - Aggregated statistics
 
 **EPUB:**

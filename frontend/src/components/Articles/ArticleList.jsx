@@ -1,7 +1,30 @@
+import { useEffect, useRef } from 'react';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ArticleCard from './ArticleCard';
 
-export default function ArticleList({ articles, isLoading }) {
+export default function ArticleList({
+  articles = [],
+  isLoading,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+}) {
+  const selectAllRef = useRef(null);
+
+  const selectable = Boolean(onToggleSelect) && Boolean(selectedIds);
+  const selectedCount = selectable
+    ? articles.filter((article) => selectedIds.has(article.id)).length
+    : 0;
+  const allSelected = articles.length > 0 && selectedCount === articles.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+
+  // "Indeterminate" is a DOM-only property, so it can't be set via JSX
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -10,7 +33,7 @@ export default function ArticleList({ articles, isLoading }) {
     );
   }
 
-  if (!articles || articles.length === 0) {
+  if (articles.length === 0) {
     return (
       <div className="text-center py-16 animate-fade-in-up">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gallery-100 mb-5">
@@ -27,10 +50,39 @@ export default function ArticleList({ articles, isLoading }) {
   }
 
   return (
-    <div className="space-y-4">
-      {articles.map((article, index) => (
-        <ArticleCard key={article.id} article={article} index={index} />
-      ))}
+    <div>
+      {selectable && (
+        <div className="flex flex-wrap items-center gap-3 mb-4 px-1">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none text-sm font-medium text-gallery-600 hover:text-gallery-900 transition-colors duration-200">
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              className="w-4 h-4 rounded border-gallery-300 text-coral-500 cursor-pointer focus:ring-coral-500"
+              checked={allSelected}
+              onChange={onToggleSelectAll}
+            />
+            {allSelected ? 'Deselect all' : 'Select all'}
+          </label>
+
+          {selectedCount > 0 && (
+            <span className="text-sm text-gallery-500">
+              {selectedCount} of {articles.length} selected on this page
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {articles.map((article, index) => (
+          <ArticleCard
+            key={article.id}
+            article={article}
+            index={index}
+            isSelected={selectable && selectedIds.has(article.id)}
+            onToggleSelect={selectable ? onToggleSelect : undefined}
+          />
+        ))}
+      </div>
     </div>
   );
 }

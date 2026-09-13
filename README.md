@@ -174,6 +174,7 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 - `GET /api/articles/:id` - Get single article
 - `PUT /api/articles/:id` - Update article properties
 - `DELETE /api/articles/:id` - Delete article
+- `DELETE /api/articles/bulk` - Delete multiple articles in one request (`{ "ids": [1, 2, 3] }`, max 500)
 - `GET /api/articles/stats` - Get aggregated statistics
 
 ### EPUB

@@ -97,6 +97,16 @@ export const validationRules = {
       .withMessage('Author must be 1-100 characters')
   ],
 
+  // Bulk article deletion
+  bulkDeleteArticles: [
+    body('ids')
+      .isArray({ min: 1, max: 500 })
+      .withMessage('ids must be an array containing 1 to 500 article IDs'),
+    body('ids.*')
+      .isInt({ min: 1 })
+      .withMessage('Each article ID must be a positive integer')
+  ],
+
   // SMTP settings validation
   updateSmtpSettings: [
     body('kindleEmail')

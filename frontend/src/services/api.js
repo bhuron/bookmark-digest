@@ -41,6 +41,7 @@ export const articlesApi = {
   create: (data) => api.post('/articles', data),
   update: (id, data) => api.put(`/articles/${id}`, data),
   delete: (id) => api.delete(`/articles/${id}`),
+  bulkDelete: (ids) => api.delete('/articles/bulk', { data: { ids } }),
 
   getStats: () => api.get('/articles/stats'),
 };

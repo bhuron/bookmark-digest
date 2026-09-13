@@ -8,15 +8,34 @@ import {
   FileText,
 } from 'lucide-react';
 import { formatRelativeTime, formatReadingTime, formatWordCount } from '../../utils/format';
+import { cn } from '../../utils/cn';
 
-export default function ArticleCard({ article, index = 0 }) {
+export default function ArticleCard({ article, index = 0, isSelected = false, onToggleSelect }) {
   return (
     <article
-      className="group card hover:border-gallery-300 hover:shadow-gallery-md transition-all duration-300 animate-fade-in-up"
+      className={cn(
+        'group card transition-all duration-300 animate-fade-in-up',
+        isSelected
+          ? 'border-coral-400 shadow-coral-sm ring-1 ring-coral-300'
+          : 'hover:border-gallery-300 hover:shadow-gallery-md'
+      )}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="p-6 lg:p-7">
         <div className="flex items-start gap-5">
+          {/* Selection Checkbox */}
+          {onToggleSelect && (
+            <label className="flex items-center pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gallery-300 text-coral-500 cursor-pointer focus:ring-coral-500"
+                checked={isSelected}
+                onChange={() => onToggleSelect(article.id)}
+                aria-label={`Select "${article.title}"`}
+              />
+            </label>
+          )}
+
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {/* Title */}
