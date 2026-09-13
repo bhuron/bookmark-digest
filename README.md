@@ -95,7 +95,9 @@ npm run dev
 ```
 
 The web UI is then at `http://localhost:5174`, and the Vite dev server proxies `/api` to
-`http://localhost:3001`. On first load you need to enter the API key from `config.json`.
+`http://localhost:3001`. On first load you need to enter the API key from `config.json`. It is remembered
+in a cookie (and localStorage), and because cookies ignore the port, entering it once covers both `:5174`
+and `:3001`.
 
 ### Browser Extension Installation
 

@@ -1,9 +1,7 @@
 import axios from 'axios';
+import { clearApiKey, getApiKey } from '../utils/apiKey';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
-
-// Get API key from localStorage
-const getApiKey = () => localStorage.getItem('bookmark_digest_api_key');
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -27,7 +25,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Clear invalid API key
-      localStorage.removeItem('bookmark_digest_api_key');
+      clearApiKey();
       window.location.href = '/settings';
     }
     return Promise.reject(error);

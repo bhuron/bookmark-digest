@@ -145,6 +145,7 @@ frontend/src/
 └── utils/
     ├── cn.js             # clsx wrapper
     ├── format.js         # Date and reading-time formatting
+    ├── apiKey.js         # API key storage shared across ports (cookie + localStorage)
     ├── selection.js      # Selection helpers: toggle, scope, select-all (unit tested)
     └── articleFilters.js # One filter object for both the list and bulk scopes
 ```
@@ -335,7 +336,10 @@ The browser extension is **fully implemented** in the `/extension` directory.
 
 ### API Communication
 - Single Axios instance in `services/api.js`
-- API key stored in localStorage, attached to all requests via `X-API-Key` header
+- The API key lives in `utils/apiKey.js` and is sent on every request as the `X-API-Key` header. It is
+  kept in a cookie *and* localStorage; the cookie is the one that matters, because localStorage is scoped
+  to an origin including the port, so `:5174` and `:3001` used to each demand the key separately. A key
+  found only in localStorage is migrated into the cookie on first read
 - Base URL configurable via environment
 
 ## Testing Strategy
@@ -351,7 +355,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 
 ### Test Status
 - Backend: 11 Jest suites (routes, services, database, config, utils, integration)
-- Frontend: pure unit tests for `utils/selection.js` and `utils/articleFilters.js`; no component tests yet
+- Frontend: pure unit tests for `utils/selection.js`, `utils/articleFilters.js` and `utils/apiKey.js`; no component tests yet
 - CI (`.github/workflows/ci.yml`) runs lint + tests on every push and pull request
 
 ## Common Patterns

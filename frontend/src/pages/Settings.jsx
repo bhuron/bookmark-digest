@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { articlesApi, settingsApi } from '../services/api';
+import { clearApiKey, getApiKey, hasApiKey, setApiKey as persistApiKey } from '../utils/apiKey';
 import { Key, Check, AlertCircle, Mail, BarChart3 } from 'lucide-react';
 
 export default function Settings() {
-  const [apiKey, setApiKey] = useState(localStorage.getItem('bookmark_digest_api_key') || '');
+  const [apiKey, setApiKey] = useState(getApiKey());
   const [status, setStatus] = useState(null);
   const [smtpSettings, setSmtpSettings] = useState({
     kindleEmail: '',
@@ -23,7 +24,7 @@ export default function Settings() {
       const response = await articlesApi.getStats();
       return response.data;
     },
-    enabled: !!localStorage.getItem('bookmark_digest_api_key'),
+    enabled: hasApiKey(),
   });
 
   useQuery({
@@ -32,7 +33,7 @@ export default function Settings() {
       const response = await settingsApi.get();
       return response.data.settings;
     },
-    enabled: !!localStorage.getItem('bookmark_digest_api_key'),
+    enabled: hasApiKey(),
     onSuccess: (data) => {
       if (data) {
         setSmtpSettings({
@@ -89,14 +90,14 @@ export default function Settings() {
   };
 
   const handleSaveApiKey = () => {
-    localStorage.setItem('bookmark_digest_api_key', apiKey.trim());
+    persistApiKey(apiKey);
     setStatus('saved');
     queryClient.invalidateQueries({ queryKey: ['stats'] });
     setTimeout(() => setStatus(null), 3000);
   };
 
   const handleClearApiKey = () => {
-    localStorage.removeItem('bookmark_digest_api_key');
+    clearApiKey();
     setApiKey('');
     setStatus('cleared');
     queryClient.clear();

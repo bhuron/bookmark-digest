@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { articlesApi, epubApi } from '../services/api';
+import { hasApiKey } from '../utils/apiKey';
 import { Book, Download, Mail, Check, AlertCircle, Loader } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -16,7 +17,7 @@ export default function EPUB() {
       const response = await articlesApi.list({ limit: 100 });
       return response.data;
     },
-    enabled: !!localStorage.getItem('bookmark_digest_api_key'),
+    enabled: hasApiKey(),
   });
 
   // Fetch EPUB exports
@@ -26,7 +27,7 @@ export default function EPUB() {
       const response = await epubApi.listExports();
       return response.data.exports;
     },
-    enabled: !!localStorage.getItem('bookmark_digest_api_key'),
+    enabled: hasApiKey(),
   });
 
   // Generate EPUB mutation
