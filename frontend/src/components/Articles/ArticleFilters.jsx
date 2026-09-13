@@ -6,6 +6,7 @@ const filterOptions = {
     { value: 'unread', label: 'Unread' },
     { value: 'archived', label: 'Archived' },
     { value: 'favorite', label: 'Favorites' },
+    { value: 'trashed', label: 'Trash' },
   ],
   sortBy: [
     { value: 'created_at', label: 'Newest First' },

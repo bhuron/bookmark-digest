@@ -41,7 +41,11 @@ export const articlesApi = {
   create: (data) => api.post('/articles', data),
   update: (id, data) => api.put(`/articles/${id}`, data),
   delete: (id) => api.delete(`/articles/${id}`),
-  bulkDelete: (ids) => api.delete('/articles/bulk', { data: { ids } }),
+  // Scope is either { ids: [...] } or { filter: {...} }; the API accepts both
+  bulkDelete: (scope) => api.delete('/articles/bulk', { data: scope }),
+  bulkUpdate: (scope, fields) => api.put('/articles/bulk', { ...scope, ...fields }),
+  restore: (scope) => api.post('/articles/restore', scope),
+  purge: (scope) => api.delete('/articles/purge', { data: scope }),
 
   getStats: () => api.get('/articles/stats'),
 };

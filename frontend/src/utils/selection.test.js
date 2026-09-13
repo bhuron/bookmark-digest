@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildScope,
+  canSelectAllMatching,
   isAllSelected,
   isPartiallySelected,
   selectedVisibleIds,
@@ -78,5 +80,41 @@ describe('isAllSelected / isPartiallySelected', () => {
   it('treats an empty list as nothing selected', () => {
     expect(isAllSelected([], new Set([1]))).toBe(false);
     expect(isPartiallySelected([], new Set([1]))).toBe(false);
+  });
+});
+
+describe('buildScope', () => {
+  it('should send the visible ids in page mode', () => {
+    expect(buildScope({ mode: 'page', articles, selectedIds: new Set([1, 99]) })).toEqual({ ids: [1] });
+  });
+
+  it('should send the filter in all mode', () => {
+    const filter = { search: 'rust' };
+    expect(buildScope({ mode: 'all', articles, selectedIds: new Set(), filter })).toEqual({ filter });
+  });
+
+  it('should never mix ids and filter', () => {
+    const scope = buildScope({ mode: 'all', articles, selectedIds: new Set([1]), filter: {} });
+
+    expect(scope).not.toHaveProperty('ids');
+    expect(scope).toHaveProperty('filter');
+  });
+});
+
+describe('canSelectAllMatching', () => {
+  it('should be false until the whole page is selected', () => {
+    expect(canSelectAllMatching(articles, new Set([1]), 100)).toBe(false);
+  });
+
+  it('should be false when everything already fits on one page', () => {
+    expect(canSelectAllMatching(articles, new Set([1, 2, 3]), 3)).toBe(false);
+  });
+
+  it('should be true when the page is fully selected and more pages exist', () => {
+    expect(canSelectAllMatching(articles, new Set([1, 2, 3]), 100)).toBe(true);
+  });
+
+  it('should be false for an empty page', () => {
+    expect(canSelectAllMatching([], new Set(), 10)).toBe(false);
   });
 });

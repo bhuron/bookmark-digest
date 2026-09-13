@@ -9,6 +9,7 @@ export default function ArticleList({
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
+  emptyMessage,
 }) {
   const selectAllRef = useRef(null);
 
@@ -42,7 +43,7 @@ export default function ArticleList({
         </div>
         <p className="text-gallery-900 font-semibold text-lg mb-2">No articles found</p>
         <p className="text-gallery-500 text-sm">
-          Use the browser extension to save your first article
+          {emptyMessage || 'Use the browser extension to save your first article'}
         </p>
       </div>
     );

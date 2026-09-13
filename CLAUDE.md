@@ -113,7 +113,7 @@ frontend/src/
 │   │   ├── ArticleCard.jsx    # Single article card (with selection checkbox)
 │   │   ├── ArticleViewer.jsx  # Full article content viewer
 │   │   ├── ArticleFilters.jsx  # Filter controls
-│   │   └── BulkActionBar.jsx  # Selection count + bulk delete actions
+│   │   └── BulkActionBar.jsx  # Bulk archive/favourite/delete/restore actions
 │   └── Common/
 │       ├── SearchBar.jsx     # Search input
 │       ├── Pagination.jsx    # Pagination controls
@@ -127,7 +127,8 @@ frontend/src/
 └── utils/
     ├── cn.js             # clsx wrapper
     ├── format.js         # Date and reading-time formatting
-    └── selection.js      # Article selection helpers (unit tested)
+    ├── selection.js      # Selection helpers: toggle, scope, select-all (unit tested)
+    └── articleFilters.js # One filter object for both the list and bulk scopes
 ```
 
 ### Article Processing Pipeline
@@ -145,6 +146,8 @@ frontend/src/
 - `capture_success` flag indicates if Readability extraction succeeded
 - Failed captures are stored with error message in `capture_error`
 - Foreign keys with CASCADE deletion (deleting article removes its images)
+- Soft delete via `deleted_at`: deleting moves an article to the trash, which lists, stats and EPUB
+  generation all exclude. Re-capturing the same URL revives the row. Only purging deletes it for real
 - Triggers auto-update `updated_at` timestamp
 - Indexes on `created_at`, `is_archived`, `is_favorite`, `site_name`, `language`
 - **Tag tables removed:** Do not reference `tags` or `article_tags` tables - they were deleted
@@ -160,12 +163,20 @@ frontend/src/
 
 **Articles:**
 - `POST /api/articles` - Create from HTML body `{ html, url }`
-- `GET /api/articles` - List with pagination/filtering `?page=1&limit=20&search=query&is_archived=false`
-- `GET /api/articles/:id` - Get single article
+- `GET /api/articles` - List with pagination/filtering. `?page=1&limit=20&search=query&is_archived=false`, plus `trashed=true` for the trash. Responds with `{ articles, total, trashedTotal }`
+- `GET /api/articles/:id` - Get single article (404 for a trashed one)
 - `PUT /api/articles/:id` - Update `{ title?, is_archived?, is_favorite? }`
-- `DELETE /api/articles/:id` - Delete article
-- `DELETE /api/articles/bulk` - Delete many articles in one transaction `{ ids: [] }` (max 500)
-- `GET /api/articles/stats` - Aggregated statistics
+- `DELETE /api/articles/:id` - Move an article to the trash (reversible)
+- `DELETE /api/articles/bulk` - Move many articles to the trash
+- `PUT /api/articles/bulk` - Bulk archive/favourite
+- `POST /api/articles/restore` - Restore trashed articles (this is what Undo calls)
+- `DELETE /api/articles/purge` - Permanently delete trashed articles and their images
+- `GET /api/articles/stats` - Aggregated statistics (live and trashed counted separately)
+
+The bulk endpoints take their targets as `{ ids: [1, 2] }` **or** `{ filter: {...} }`, never both. The
+filter form is what makes "select all N matching" work across pages: the filter object is exactly the one
+the list request used, so the two can never disagree. `backend/src/utils/spaRoutes.js` and the frontend's
+`utils/articleFilters.js` are the counterparts to keep in step.
 
 **EPUB:**
 - `POST /api/epub/generate` - Generate EPUB `{ articleIds: [], title?, author? }`
@@ -240,6 +251,7 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 - URLs in article HTML are replaced with local paths recorded in `article_images`
 - If image download fails, article is still saved (images skipped)
 - Deleting articles removes their recorded image files and prunes directories left empty; every path is validated to stay inside the images directory
+- Trashing keeps image files so the delete stays reversible - only purging removes them
 
 ### Reading Time Calculation
 - Based on 200 words per minute average
@@ -311,7 +323,7 @@ The browser extension is **fully implemented** in the `/extension` directory.
 
 ### Test Status
 - Backend: 10 Jest suites (routes, services, database, config, utils, integration)
-- Frontend: pure unit tests for `utils/selection.js`; no component tests yet
+- Frontend: pure unit tests for `utils/selection.js` and `utils/articleFilters.js`; no component tests yet
 - CI (`.github/workflows/ci.yml`) runs lint + tests on every push and pull request
 
 ## Common Patterns

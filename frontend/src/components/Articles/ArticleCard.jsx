@@ -6,6 +6,7 @@ import {
   Archive,
   ExternalLink,
   FileText,
+  Trash2,
 } from 'lucide-react';
 import { formatRelativeTime, formatReadingTime, formatWordCount } from '../../utils/format';
 import { cn } from '../../utils/cn';
@@ -38,15 +39,21 @@ export default function ArticleCard({ article, index = 0, isSelected = false, on
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {/* Title */}
-            <Link
-              to={`/articles/${article.id}`}
-              className="block group/link"
-            >
-              <h3 className="font-display font-semibold text-xl leading-snug text-gallery-900 group-hover/link:text-coral-600 transition-colors duration-200 line-clamp-2">
+            {/* Title - a trashed article has no detail page, so it is not a link */}
+            {article.is_trashed ? (
+              <h3 className="font-display font-semibold text-xl leading-snug text-gallery-500 line-clamp-2">
                 {article.title}
               </h3>
-            </Link>
+            ) : (
+              <Link
+                to={`/articles/${article.id}`}
+                className="block group/link"
+              >
+                <h3 className="font-display font-semibold text-xl leading-snug text-gallery-900 group-hover/link:text-coral-600 transition-colors duration-200 line-clamp-2">
+                  {article.title}
+                </h3>
+              </Link>
+            )}
 
             {/* Metadata Row */}
             <div className="flex flex-wrap items-center gap-4 mt-3.5 text-sm text-gallery-500">
@@ -93,6 +100,12 @@ export default function ArticleCard({ article, index = 0, isSelected = false, on
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 pt-1">
+            {article.is_trashed && (
+              <div className="badge badge-default">
+                <Trash2 className="w-3 h-3 mr-1" strokeWidth={2.5} />
+                In trash
+              </div>
+            )}
             {article.is_favorite && (
               <div className="badge badge-coral">
                 <Star className="w-3 h-3 mr-1 fill-current" strokeWidth={2.5} />

@@ -6,6 +6,7 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 
 - **Browser Extension** (Chrome/Firefox) - One-click article capture from any webpage
 - **Web UI** - React-based interface for managing articles
+- **Trash & Undo** - Deleting moves articles to a trash you can restore from, individually or in bulk
 - **EPUB Generation** - Batch convert articles to EPUB 3.3 format
 - **Kindle Integration** - Email EPUBs directly to your Kindle
 - **Local Storage** - SQLite database with all content stored locally
@@ -185,12 +186,18 @@ These warnings will be resolved when `jsdom` updates their dependencies in a fut
 ### Articles
 - `POST /api/articles` - Create article from HTML
 - `GET /api/articles` - List articles with pagination and filtering
-  - Query params: `?page=1&limit=20&search=query&is_archived=false`
+  - Query params: `?page=1&limit=20&search=query&is_archived=false`, or `trashed=true` for the trash
 - `GET /api/articles/:id` - Get single article
 - `PUT /api/articles/:id` - Update article properties
-- `DELETE /api/articles/:id` - Delete article
-- `DELETE /api/articles/bulk` - Delete multiple articles in one request (`{ "ids": [1, 2, 3] }`, max 500)
+- `DELETE /api/articles/:id` - Move an article to the trash (reversible)
+- `DELETE /api/articles/bulk` - Move many articles to the trash
+- `PUT /api/articles/bulk` - Bulk archive or favourite
+- `POST /api/articles/restore` - Restore trashed articles
+- `DELETE /api/articles/purge` - Permanently delete trashed articles and their images
 - `GET /api/articles/stats` - Get aggregated statistics
+
+The bulk endpoints target either `{ "ids": [1, 2, 3] }` (max 500) or `{ "filter": { ... } }`, which
+selects the whole matching set server-side — that is how "select all N matching" spans pages.
 
 ### EPUB
 - `POST /api/epub/generate` - Generate EPUB from articles

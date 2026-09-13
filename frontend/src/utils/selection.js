@@ -62,3 +62,35 @@ export function isPartiallySelected(articles, selectedIds) {
   const count = selectedVisibleIds(articles, selectedIds).length;
   return count > 0 && count < articles.length;
 }
+
+/**
+ * Build the target scope sent to the bulk endpoints.
+ *
+ * In 'all' mode the server selects the matching set itself, which is what makes
+ * "select all matching" work across pages without shipping thousands of ids.
+ *
+ * @param {Object} options
+ * @param {'page'|'all'} options.mode - Whether the whole matching set is targeted
+ * @param {Array<{id: number}>} options.articles - Articles on the current page
+ * @param {Set<number>} options.selectedIds - Current selection
+ * @param {Object} options.filter - Filter describing the matching set
+ * @returns {{ids?: number[], filter?: Object}}
+ */
+export function buildScope({ mode, articles, selectedIds, filter }) {
+  if (mode === 'all') {
+    return { filter };
+  }
+
+  return { ids: selectedVisibleIds(articles, selectedIds) };
+}
+
+/**
+ * True when every article on the page is selected and more pages exist, which is
+ * the only situation where offering "select all matching" makes sense.
+ */
+export function canSelectAllMatching(articles, selectedIds, total) {
+  return articles.length > 0 &&
+    selectedIds !== undefined &&
+    total > articles.length &&
+    isAllSelected(articles, selectedIds);
+}
