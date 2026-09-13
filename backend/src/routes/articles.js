@@ -1,42 +1,12 @@
 import express from 'express';
 import articleProcessor from '../services/articleProcessor.js';
-import imageHandler from '../services/imageHandler.js';
+import articleService from '../services/articleService.js';
 import { validateRequest, validationRules } from '../middleware/validation.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { articleCreationLimiter } from '../middleware/rateLimiter.js';
-import { getConnection } from '../database/index.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
-
-/**
- * Delete articles by ID and remove their image files from disk.
- * Shared by the single and bulk delete endpoints so both stay in step.
- *
- * @param {number[]} ids - Article IDs to delete
- * @returns {Promise<{deleted: number, imagesRemoved: number, imageCount: number}>}
- */
-async function deleteArticlesByIds(ids) {
-  const db = getConnection();
-  const placeholders = ids.map(() => '?').join(', ');
-
-  // Collect image paths before the rows are removed by ON DELETE CASCADE
-  const imagePaths = db
-    .prepare(`SELECT local_path FROM article_images WHERE article_id IN (${placeholders})`)
-    .all(...ids)
-    .map(row => row.local_path);
-
-  const deleteStmt = db.prepare(`DELETE FROM articles WHERE id IN (${placeholders})`);
-
-  // Single transaction: the whole batch succeeds or nothing is deleted
-  const deleted = db.transaction(() => deleteStmt.run(...ids).changes)();
-
-  // Filesystem cleanup is best-effort: the rows are already gone and a failed
-  // unlink must not fail the request
-  const imagesRemoved = await imageHandler.deleteImageFiles(imagePaths);
-
-  return { deleted, imagesRemoved, imageCount: imagePaths.length };
-}
 
 /**
  * POST /api/articles
@@ -93,83 +63,28 @@ router.get('/',
   validationRules.listArticles,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, search, is_archived, is_favorite, sort_by = 'created_at' } = req.query;
-    const offset = (page - 1) * limit;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      is_archived,
+      is_favorite,
+      sort_by = 'created_at'
+    } = req.query;
 
-    const db = getConnection();
-
-    // Build WHERE clause
-    let whereConditions = ['a.capture_success = 1'];
-    const params = [];
-
-
-
-    if (search) {
-      whereConditions.push('(a.title LIKE ? OR a.content_text LIKE ? OR a.excerpt LIKE ?)');
-      const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
-    }
-
-    if (is_archived !== undefined) {
-      whereConditions.push('a.is_archived = ?');
-      params.push(is_archived === 'true' ? 1 : 0);
-    }
-
-    if (is_favorite !== undefined) {
-      whereConditions.push('a.is_favorite = ?');
-      params.push(is_favorite === 'true' ? 1 : 0);
-    }
-
-    const whereClause = whereConditions.join(' AND ');
-
-    // Build ORDER BY clause
-    let orderBy = 'a.created_at DESC';
-    switch (sort_by) {
-      case 'created_at_asc':
-        orderBy = 'a.created_at ASC';
-        break;
-      case 'title':
-        orderBy = 'a.title ASC';
-        break;
-      case 'title_desc':
-        orderBy = 'a.title DESC';
-        break;
-      case 'reading_time':
-        orderBy = 'a.reading_time_minutes ASC';
-        break;
-      case 'created_at':
-      default:
-        orderBy = 'a.created_at DESC';
-        break;
-    }
-
-    // Fetch articles
-    const articles = db.prepare(`
-      SELECT a.*
-      FROM articles a
-      WHERE ${whereClause}
-      ORDER BY ${orderBy}
-      LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
-
-    // Get count
-    const countResult = db.prepare(`
-      SELECT COUNT(*) as total
-      FROM articles a
-      WHERE ${whereClause}
-    `).get(...params);
-
-    const articlesWithMetadata = articles.map(article => ({
-      ...article,
-      has_images: Boolean(article.has_images),
-      is_archived: Boolean(article.is_archived),
-      is_favorite: Boolean(article.is_favorite)
-    }));
+    const { articles, total } = articleService.listArticles({
+      page: Number(page),
+      limit: Number(limit),
+      search,
+      is_archived,
+      is_favorite,
+      sort_by
+    });
 
     res.json({
       data: {
-        articles: articlesWithMetadata,
-        total: countResult.total
+        articles,
+        total
       }
     });
   })
@@ -181,32 +96,7 @@ router.get('/',
  */
 router.get('/stats',
   asyncHandler(async (req, res) => {
-    const db = getConnection();
-
-    const stats = db.prepare(`
-      SELECT
-        COUNT(*) as total_articles,
-        SUM(CASE WHEN is_archived = 1 THEN 1 ELSE 0 END) as archived_articles,
-        SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) as favorite_articles,
-        SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END) as unread_articles,
-        SUM(CASE WHEN has_images = 1 THEN 1 ELSE 0 END) as articles_with_images,
-        SUM(word_count) as total_words,
-        SUM(reading_time_minutes) as total_reading_time
-      FROM articles
-      WHERE capture_success = 1
-    `).get();
-
-
-
-    res.json({
-      total_articles: stats.total_articles || 0,
-      archived_articles: stats.archived_articles || 0,
-      favorite_articles: stats.favorite_articles || 0,
-      unread_articles: stats.unread_articles || 0,
-      articles_with_images: stats.articles_with_images || 0,
-      total_words: stats.total_words || 0,
-      total_reading_time: stats.total_reading_time || 0
-    });
+    res.json(articleService.getStats());
   })
 );
 
@@ -218,14 +108,7 @@ router.get('/:id',
   validationRules.articleId,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const db = getConnection();
-
-    const article = db.prepare(`
-      SELECT a.*
-      FROM articles a
-      WHERE a.id = ?
-    `).get(id);
+    const article = articleService.getArticleById(req.params.id);
 
     if (!article) {
       return res.status(404).json({
@@ -234,14 +117,7 @@ router.get('/:id',
       });
     }
 
-    res.json({
-      article: {
-        ...article,
-        has_images: Boolean(article.has_images),
-        is_archived: Boolean(article.is_archived),
-        is_favorite: Boolean(article.is_favorite)
-      }
-    });
+    res.json({ article });
   })
 );
 
@@ -255,50 +131,28 @@ router.put('/:id',
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { title, is_archived, is_favorite } = req.body;
-    const db = getConnection();
 
-    // Check if article exists
-    const existing = db.prepare('SELECT id FROM articles WHERE id = ?').get(id);
-    if (!existing) {
+    const { found, updated } = articleService.updateArticle(id, {
+      title,
+      is_archived,
+      is_favorite
+    });
+
+    if (!found) {
       return res.status(404).json({
         error: 'Not Found',
         message: 'Article not found'
       });
     }
 
-    // Build update query
-    const updates = [];
-    const params = [];
-
-    if (title !== undefined) {
-      updates.push('title = ?');
-      params.push(title);
-    }
-    if (is_archived !== undefined) {
-      updates.push('is_archived = ?');
-      params.push(is_archived ? 1 : 0);
-    }
-    if (is_favorite !== undefined) {
-      updates.push('is_favorite = ?');
-      params.push(is_favorite ? 1 : 0);
-    }
-
-    if (updates.length === 0) {
+    if (!updated) {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'No fields to update'
       });
     }
 
-    params.push(id);
-    const updateStmt = db.prepare(`
-      UPDATE articles SET ${updates.join(', ')}
-      WHERE id = ?
-    `);
-
-    updateStmt.run(...params);
-
-    logger.info('Article updated', { articleId: id, updates: updates.join(', ') });
+    logger.info('Article updated', { articleId: id });
 
     res.json({
       success: true,
@@ -319,7 +173,7 @@ router.delete('/bulk',
     // Deduplicate so the reported counts stay accurate
     const ids = [...new Set(req.body.ids.map(Number))];
 
-    const { deleted, imagesRemoved } = await deleteArticlesByIds(ids);
+    const { deleted, imagesRemoved } = await articleService.deleteArticlesByIds(ids);
     const notFound = ids.length - deleted;
 
     logger.info('Articles bulk deleted', {
@@ -348,10 +202,9 @@ router.delete('/:id',
   validationRules.articleId,
   validateRequest,
   asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const articleId = Number(id);
+    const articleId = Number(req.params.id);
 
-    const { deleted, imagesRemoved } = await deleteArticlesByIds([articleId]);
+    const { deleted, imagesRemoved } = await articleService.deleteArticlesByIds([articleId]);
 
     if (deleted === 0) {
       return res.status(404).json({
@@ -368,9 +221,5 @@ router.delete('/:id',
     });
   })
 );
-
-
-
-
 
 export default router;
