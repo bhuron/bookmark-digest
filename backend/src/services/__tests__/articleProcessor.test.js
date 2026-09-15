@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+import { JSDOM } from 'jsdom';
 import articleProcessor from '../articleProcessor.js';
 
 describe('ArticleProcessor', () => {
@@ -154,6 +155,67 @@ describe('ArticleProcessor', () => {
       const result = await articleProcessor.processArticle(html, url, { skipImages: true });
 
       expect(result).toHaveProperty('success', true);
+    });
+  });
+
+  describe('graphics', () => {
+    const longText = 'The quick brown fox jumps over the lazy dog and keeps going. '.repeat(20);
+    const html = `<html><head><title>Charted</title></head><body><article>
+      <h1>Charted</h1>
+      <figure>
+        <picture>
+          <source srcset="/hero.avif 1200w" type="image/avif">
+          <img srcset="/hero-800.jpg 800w, /hero-1600.jpg 1600w" sizes="100vw" alt="A chart">
+        </picture>
+        <figcaption>Chart caption</figcaption>
+      </figure>
+      <p>${longText}</p>
+      <p>${longText}</p>
+      <p>${longText}</p>
+    </article></body></html>`;
+
+    it('should keep srcset and sizes through sanitising', async () => {
+      // The regression this guards: srcset was absent from ALLOWED_ATTR, so a
+      // responsive image lost the only URL it had before the downloader ran
+      const result = await articleProcessor.processArticle(
+        html,
+        'https://example.com/charted',
+        { preserveImages: false }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.contentHtml).toContain('srcset="https://example.com/hero-800.jpg 800w, https://example.com/hero-1600.jpg 1600w"');
+      expect(result.contentHtml).toContain('sizes="100vw"');
+    });
+
+    it('should count every kind of graphic in a capture', () => {
+      const dom = new JSDOM('<div>' +
+        '<img src="/a.jpg">' +
+        '<img srcset="/b.jpg 800w">' +
+        '<picture><source srcset="/c.avif 100w"><img src="/c.jpg"></picture>' +
+        '<svg><circle r="1"></circle></svg>' +
+        '<canvas></canvas>' +
+        '<iframe src="/embed"></iframe>' +
+        '<figure></figure>' +
+        '<ft-chart id="host"></ft-chart>' +
+        '</div>');
+
+      const census = articleProcessor._graphicsCensus(dom.window.document);
+
+      expect(census).toEqual({
+        img: 3,
+        picture: 1,
+        srcset: 2,
+        svg: 1,
+        canvas: 1,
+        iframe: 1,
+        figure: 1,
+        custom: 1
+      });
+    });
+
+    it('should count nothing for a missing node', () => {
+      expect(articleProcessor._graphicsCensus(null).img).toBe(0);
     });
   });
 

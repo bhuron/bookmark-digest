@@ -1,8 +1,11 @@
 import { jest, describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
 import sharp from 'sharp';
+import { JSDOM } from 'jsdom';
 import imageHandler from '../imageHandler.js';
 import fs from 'fs/promises';
 import path from 'path';
+
+const element = (html) => new JSDOM(html).window.document.body.firstElementChild;
 
 describe('ImageHandler', () => {
   // Some tests download for real, straight into the application images
@@ -142,6 +145,54 @@ describe('ImageHandler', () => {
 
       const src = imageHandler._getImageSrc(mockImg);
       expect(src).toBeNull();
+    });
+
+    it('should prefer src over srcset when both are present', () => {
+      const img = element('<img src="/plain.jpg" srcset="/big.jpg 2000w, /small.jpg 400w">');
+
+      expect(imageHandler._getImageSrc(img)).toBe('/plain.jpg');
+    });
+
+    it('should fall back to the largest srcset candidate when there is no src', () => {
+      const img = element('<img srcset="/small.jpg 400w, /huge.jpg 2000w, /mid.jpg 800w">');
+
+      expect(imageHandler._getImageSrc(img)).toBe('/huge.jpg');
+    });
+
+    it('should prefer a picture source over the img srcset', () => {
+      const html = '<picture>' +
+        '<source srcset="/avif/hero.avif 1600w" type="image/avif">' +
+        '<source srcset="/webp/hero.webp 1200w" type="image/webp">' +
+        '<img srcset="/jpg/hero.jpg 900w">' +
+        '</picture>';
+
+      expect(imageHandler._getImageSrc(element(html).querySelector('img'))).toBe('/avif/hero.avif');
+    });
+
+    it('should read a density srcset', () => {
+      const img = element('<img srcset="/one.jpg 1x, /two.jpg 2x">');
+
+      expect(imageHandler._getImageSrc(img)).toBe('/two.jpg');
+    });
+  });
+
+  describe('_bestSrcsetCandidate', () => {
+    it('should return null for an absent or empty srcset', () => {
+      expect(imageHandler._bestSrcsetCandidate(null)).toBeNull();
+      expect(imageHandler._bestSrcsetCandidate(undefined)).toBeNull();
+      expect(imageHandler._bestSrcsetCandidate('   ')).toBeNull();
+    });
+
+    it('should accept a candidate with no descriptor', () => {
+      expect(imageHandler._bestSrcsetCandidate('/only.jpg')).toBe('/only.jpg');
+    });
+
+    it('should ignore a srcset it cannot split reliably', () => {
+      // The comma separator is ambiguous inside a data URI, and a wrong guess
+      // would turn a fragment of base64 into an image URL
+      const srcset = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg 1x, /real.jpg 2x';
+
+      expect(imageHandler._bestSrcsetCandidate(srcset)).toBeNull();
     });
   });
 
@@ -569,6 +620,84 @@ describe('ImageHandler', () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(2);
       expect(result.images).toEqual([]);
+    });
+  });
+
+  describe('responsive images', () => {
+    const url = 'https://example.com/responsive-test';
+    const html = '<figure><picture>' +
+      '<source srcset="/hero.avif 1200w" type="image/avif">' +
+      '<img srcset="/hero-400.jpg 400w, /hero-1600.jpg 1600w" sizes="100vw" alt="A chart">' +
+      '</picture><figcaption>Chart caption</figcaption></figure>';
+
+    let sourceJpeg;
+
+    beforeAll(async () => {
+      sourceJpeg = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: '#224466' }
+      }).jpeg().toBuffer();
+    });
+
+    afterEach(() => {
+      global.fetch = undefined;
+    });
+
+    // The image only lives in srcset, which is the regression this guards: a
+    // responsive chart used to be skipped as "no src" and never downloaded
+    it('should download a picture source when the img has no src', async () => {
+      global.fetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: (header) => (header === 'content-type' ? 'image/jpeg' : null) },
+        arrayBuffer: () => Promise.resolve(sourceJpeg)
+      }));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Responsive Test');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch.mock.calls[0][0]).toBe('https://example.com/hero.avif');
+
+      expect(result.images).toHaveLength(1);
+      // Unresolved on purpose: the caller sees what the capture offered, and
+      // _downloadImage resolves it against the article URL
+      expect(result.images[0].originalUrl).toBe('/hero.avif');
+      expect(result.html).toContain('src="/images/responsive-test-');
+    });
+
+    it('should leave no remote candidate behind once the image is local', async () => {
+      global.fetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: (header) => (header === 'content-type' ? 'image/jpeg' : null) },
+        arrayBuffer: () => Promise.resolve(sourceJpeg)
+      }));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Responsive Test');
+
+      expect(result.html).not.toMatch(/srcset=/);
+      expect(result.html).not.toContain('sizes=');
+      expect(result.html).not.toContain('<source');
+      expect(result.html).not.toContain('hero-1600.jpg');
+      expect(result.html).toContain('Chart caption');
+    });
+
+    it('should fall back to the img srcset when the picture cannot be used', async () => {
+      const noPicture = '<img srcset="/chart-400.jpg 400w, /chart-1600.jpg 1600w" alt="Chart">';
+
+      global.fetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: (header) => (header === 'content-type' ? 'image/jpeg' : null) },
+        arrayBuffer: () => Promise.resolve(sourceJpeg)
+      }));
+
+      const result = await imageHandler.downloadAndReplaceImages(noPicture, url, 'Responsive Test');
+
+      expect(global.fetch.mock.calls[0][0]).toBe('https://example.com/chart-1600.jpg');
+      expect(result.images).toHaveLength(1);
     });
   });
 });

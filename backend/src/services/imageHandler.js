@@ -93,6 +93,10 @@ class ImageHandler {
         // Update image src to relative path
         img.setAttribute('src', localPath);
 
+        // The remote candidates are dead weight now that a local file exists, and
+        // a reader or an EPUB must not fetch the original again
+        this._dropRemoteCandidates(img);
+
         downloadedImages.push({
           originalUrl: src,
           localPath,
@@ -125,11 +129,103 @@ class ImageHandler {
    * Check data attributes first as they contain the real URLs in lazy-loading scenarios
    */
   _getImageSrc(img) {
-    return img.dataset?.src ||
+    const lazySrc = img.dataset?.src ||
            img.getAttribute('data-src') ||
            img.getAttribute('data-lazy-src') ||
-           img.getAttribute('data-original') ||
-           img.src;
+           img.getAttribute('data-original');
+
+    if (lazySrc) {
+      return lazySrc;
+    }
+
+    // A real src (already resolved against the document) beats srcset, which is
+    // only a set of alternatives
+    const directSrc = img.src || img.getAttribute('src');
+
+    if (directSrc) {
+      return directSrc;
+    }
+
+    // No src at all: a responsive image keeps its candidates in srcset, which is
+    // the only place some articles publish. The browser paints a <picture>
+    // source in preference to the img, so follow that order, and take the largest
+    // candidate - downloads are capped at 1200px anyway, so the biggest source
+    // loses no detail.
+    const picture = img.closest?.('picture');
+
+    if (picture) {
+      for (const source of picture.querySelectorAll('source[srcset]')) {
+        const candidate = this._bestSrcsetCandidate(source.getAttribute('srcset'));
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+
+    return this._bestSrcsetCandidate(img.getAttribute('srcset'));
+  }
+
+  /**
+   * Largest URL in a srcset attribute, or null when there is none
+   *
+   * Candidates are separated by commas and described by a width (640w), a pixel
+   * density (2x) or nothing at all.
+   *
+   * @param {string} srcset - Raw srcset attribute value
+   * @returns {string|null} - Chosen URL, still relative to the document
+   */
+  _bestSrcsetCandidate(srcset) {
+    if (typeof srcset !== 'string' || !srcset.trim()) {
+      return null;
+    }
+
+    // A comma inside a data URI is indistinguishable from the separator without
+    // a real srcset parser, so leave such an attribute alone rather than pick a
+    // fragment of a base64 image as if it were a URL
+    if (srcset.includes('data:')) {
+      return null;
+    }
+
+    const candidates = srcset
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean)
+      .map(part => {
+        const [url, ...descriptors] = part.split(/\s+/);
+        const width = descriptors.find(descriptor => descriptor.endsWith('w'));
+        const density = descriptors.find(descriptor => descriptor.endsWith('x'));
+        const rank = width ? parseInt(width, 10) : (density ? parseFloat(density) * 1000 : 1);
+
+        // Widths and densities never mix within one srcset; the scale factor only
+        // keeps the two shapes comparable. An unreadable descriptor ranks last
+        return { url, rank: Number.isFinite(rank) ? rank : 0 };
+      })
+      .filter(candidate => candidate.url);
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    return candidates.reduce((best, candidate) => (candidate.rank > best.rank ? candidate : best)).url;
+  }
+
+  /**
+   * Drop the remote candidates once a local file has replaced them, so the stored
+   * HTML and the EPUB carry no leftover reference to the original image
+   *
+   * @param {Element} img - Image element already rewritten to a local path
+   */
+  _dropRemoteCandidates(img) {
+    img.removeAttribute('srcset');
+    img.removeAttribute('sizes');
+
+    const picture = img.closest?.('picture');
+
+    if (picture) {
+      for (const source of picture.querySelectorAll('source')) {
+        source.remove();
+      }
+    }
   }
 
   /**

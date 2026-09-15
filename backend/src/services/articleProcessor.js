@@ -45,6 +45,10 @@ class ArticleProcessor {
       throw new Error(`Failed to parse HTML: ${error.message}`);
     }
 
+    // Readability strips the document it parses as it harvests, so the raw
+    // capture is counted before it runs
+    const rawCensus = this._graphicsCensus(dom.window.document);
+
     // Extract with Readability
     const reader = new Readability(dom.window.document, this.readabilityOptions);
     const article = reader.parse();
@@ -72,13 +76,23 @@ class ArticleProcessor {
       article.content = article.content.substring(0, this.MAX_ARTICLE_LENGTH);
     }
 
-    // Sanitize HTML to remove malicious content
+    // Sanitize HTML to remove malicious content.
+    //
+    // srcset and sizes must be allowed explicitly: passing ALLOWED_ATTR replaces
+    // DOMPurify's defaults, and without them a responsive image loses the only
+    // URL it carries, silently and before the downloader ever sees it.
     const DOMPurify = createDOMPurify(dom.window);
     const sanitizedContent = DOMPurify.sanitize(article.content, {
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'width', 'height', 'class', 'style', 'loading', 'target', 'rel', 'data-*'],
+      ALLOWED_ATTR: ['href', 'src', 'srcset', 'sizes', 'alt', 'title', 'width', 'height', 'class', 'style', 'loading', 'target', 'rel', 'data-*'],
       ADD_TAGS: ['figure', 'figcaption'],
       ADD_ATTR: ['loading', 'target', 'rel', 'data-*']
     });
+
+    // A graphic that is not in the stored HTML cannot be recovered afterwards,
+    // and any of the three stages can be the one that lost it, so count what each
+    // stage holds: missing from the raw capture is an extension problem, missing
+    // after Readability is an extraction problem, missing after sanitising is ours
+    this._logGraphicsCensus(url, dom.window.document, rawCensus, article.content, sanitizedContent);
 
     // Download and process images if enabled
     let processedHtml = sanitizedContent;
@@ -129,6 +143,69 @@ class ArticleProcessor {
       imageCount: imageData.length,
       images: imageData
     };
+  }
+
+  /**
+   * Count the elements that carry a graphic, in any node or document
+   *
+   * @param {Document|Element} root - Node to search
+   * @returns {object} - Element counts per kind
+   */
+  _graphicsCensus(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') {
+      return { img: 0, picture: 0, srcset: 0, svg: 0, canvas: 0, iframe: 0, figure: 0, custom: 0 };
+    }
+
+    return {
+      img: root.querySelectorAll('img').length,
+      picture: root.querySelectorAll('picture').length,
+      srcset: root.querySelectorAll('img[srcset], source[srcset]').length,
+      svg: root.querySelectorAll('svg').length,
+      canvas: root.querySelectorAll('canvas').length,
+      iframe: root.querySelectorAll('iframe').length,
+      figure: root.querySelectorAll('figure').length,
+      // A hyphen in a tag name means a custom element, which is a likely host for
+      // a JavaScript-drawn chart: its content lives in a shadow root, and
+      // outerHTML has no shadow root to serialise
+      custom: Array.from(root.querySelectorAll('*'))
+        .filter(element => element.tagName.includes('-')).length
+    };
+  }
+
+  /**
+   * Log the graphics census of each pipeline stage so a missing chart can be
+   * traced to the stage that lost it. Quiet for ordinary photo articles; loud as
+   * soon as the capture holds a graphic the image pipeline cannot download.
+   *
+   * @param {string} url - Article URL
+   * @param {Document} doc - Document the raw capture was parsed into
+   * @param {object} rawCensus - Census of the raw capture, taken before Readability ran
+   * @param {string} extractedHtml - Readability output
+   * @param {string} sanitizedHtml - Sanitised content
+   */
+  _logGraphicsCensus(url, doc, rawCensus, extractedHtml, sanitizedHtml) {
+    // Counted in a detached element, so the document being inspected is untouched
+    const probe = doc.createElement('div');
+    const censusOf = (html) => {
+      probe.innerHTML = html || '';
+      const census = this._graphicsCensus(probe);
+      probe.innerHTML = '';
+      return census;
+    };
+
+    const raw = rawCensus || this._graphicsCensus(doc);
+    const extracted = censusOf(extractedHtml);
+    const sanitized = censusOf(sanitizedHtml);
+
+    const interesting = raw.svg > 0 || raw.canvas > 0 || raw.iframe > 0 ||
+      raw.picture > 0 || raw.srcset > 0 || raw.custom > 0;
+
+    logger[interesting ? 'info' : 'debug']('Graphics census', {
+      url,
+      raw,
+      extracted,
+      sanitized
+    });
   }
 
   /**
