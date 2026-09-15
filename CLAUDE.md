@@ -164,6 +164,17 @@ frontend/src/
 5. **Images**: Optionally download images locally (via `imageHandler.js`)
 6. **Save**: Store in SQLite with metadata (word count, reading time, author, etc.)
 
+Every capture logs a **graphics census** (`Graphics census`) with the `img`, `picture`, `srcset`, `svg`,
+`canvas`, `iframe`, `figure` and custom-element counts at each stage. It is informational when the capture
+holds something the image pipeline cannot download, and `debug` otherwise, so ordinary photo articles stay
+quiet. The point is to make a missing chart attributable: a graphic absent from `raw` was never in the
+extension's capture, one that disappears between `raw` and `extracted` was dropped by Readability, one lost
+between `extracted` and `sanitized` was dropped by our own sanitiser. Two limits are built in and show up
+here rather than silently: Readability itself discards `<iframe>` (an embedded chart is gone before we see
+it), and DOMPurify discards custom elements such as `<ft-chart>`. Inline `<svg>` and `<canvas>` survive both
+stages. A chart a site renders inside a shadow root never appears in any census, because `outerHTML` has no
+shadow root to serialise.
+
 ### Database Schema Key Points
 
 - Articles have a unique constraint on `url` (UPSERT on duplicate)
@@ -275,6 +286,19 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 - Images are stored under `backend/images/<title-slug>-<url-hash>/` and served at `/images/...`
 - The directory name includes a hash of the article URL, so two articles with the same title cannot collide
 - URLs in article HTML are replaced with local paths recorded in `article_images`
+- `srcset` and `sizes` are in the sanitiser's `ALLOWED_ATTR` on purpose: passing `ALLOWED_ATTR` replaces
+  DOMPurify's defaults, and a responsive image often carries its only URL in `srcset`. Losing the attribute
+  there is silent and permanent, because the downloader only ever sees the sanitised HTML
+- A source is chosen in this order: a lazy-loading data attribute, then the real `src`, then the largest
+  candidate in the enclosing `<picture>` sources, then the largest candidate in the `<img>`'s own `srcset`.
+  Widths (`800w`) and densities (`2x`) are both understood, and a `srcset` containing a `data:` URI is left
+  alone rather than parsed, since a comma inside a data URI is indistinguishable from the separator
+- Once an image is local its remote candidates are removed, so the reader and the EPUB never fetch the
+  original again
+- Requests advertise only the formats this sharp build can decode, in preference order, and retry once with
+  a conservative `Accept` when a CDN answers with something unreadable (AVIF decoding is a sharp build
+  option, so it is claimed only where it exists). Anything that is not already JPEG or PNG is re-encoded to
+  JPEG, which keeps the bytes on disk in agreement with the `.jpg` name they are given
 - If image download fails, article is still saved (images skipped)
 - Deleting articles removes their recorded image files and prunes directories left empty; every path is validated to stay inside the images directory
 - Trashing keeps image files so the delete stays reversible - only purging removes them

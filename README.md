@@ -331,6 +331,23 @@ npm test                # Run Vitest tests
 ### Tag Feature Removed
 The tag feature was previously implemented but has been removed due to bugs. All tag-related database tables, API endpoints, and frontend components have been deleted. Do not attempt to restore or reference tag functionality.
 
+### Some images or charts are not captured
+The images a capture keeps are the ones the extension could see in `document.documentElement.outerHTML`
+and that survive extraction. Three limits are worth knowing, and each capture reports them:
+
+- A `srcset`-only image is now downloaded (its largest candidate), so responsive images are kept. `srcset`
+  was previously stripped by the sanitiser and such images were silently skipped.
+- An embedded `<iframe>` is dropped by Readability before the image pipeline runs, and a custom element such
+  as `<ft-chart>` is dropped by DOMPurify. A chart delivered that way cannot be captured; only an inline
+  `<svg>` or `<canvas>` survives.
+- A chart a site draws inside a shadow root never reaches the capture at all, because `outerHTML` has no
+  shadow root to serialise.
+
+Every capture writes one `Graphics census` log line with the `img`, `picture`, `srcset`, `svg`, `canvas`,
+`iframe`, `figure` and custom-element counts before extraction, after Readability and after sanitising
+(`debug` level for ordinary photo-only articles, `info` as soon as something else is present). Comparing the
+three tells you which stage lost the graphic, or that it was never in the capture.
+
 ### Recent Bug Fixes
 - **Image display** - Fixed missing leading slash in image paths
 - **CSS parsing errors** - Suppressed JSDOM errors with VirtualConsole
@@ -343,7 +360,6 @@ The tag feature was previously implemented but has been removed due to bugs. All
 ## Future Enhancements
 
 Potential features for future development:
-- Full-text search
 - Newsletter generation
 - Import from Pocket/Instapaper
 - Mobile app (React Native)
