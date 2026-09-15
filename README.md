@@ -350,7 +350,7 @@ three tells you which stage lost the graphic, or that it was never in the captur
 
 The census counts what a stage dropped, never what it was. To identify the graphics themselves, set
 `DEBUG_SAVE_RAW_HTML=true` (in the root `.env`) and capture the article once more: the untouched HTML is
-written to `data/raw-captures/<title>-<url-hash>.html`, which is the only place the dropped markup still
+written to `backend/data/raw-captures/<title>-<url-hash>.html`, which is the only place the dropped markup still
 exists. The directory is gitignored and the flag is off by default, because each file can be as large as
 `MAX_ARTICLE_SIZE_MB` and holds more than the article.
 
