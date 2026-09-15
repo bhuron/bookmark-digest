@@ -335,13 +335,16 @@ The tag feature was previously implemented but has been removed due to bugs. All
 The images a capture keeps are the ones the extension could see in `document.documentElement.outerHTML`
 and that survive extraction. Three limits are worth knowing, and each capture reports them:
 
-- A `srcset`-only image is now downloaded (its largest candidate), so responsive images are kept. `srcset`
-  was previously stripped by the sanitiser and such images were silently skipped.
-- An embedded `<iframe>` is dropped by Readability before the image pipeline runs, and a custom element such
-  as `<ft-chart>` is dropped by DOMPurify. A chart delivered that way cannot be captured; only an inline
-  `<svg>` or `<canvas>` survives.
-- A chart a site draws inside a shadow root never reaches the capture at all, because `outerHTML` has no
-  shadow root to serialise.
+- A `srcset`-only image is downloaded (its largest candidate), so responsive images are kept. `srcset` was
+  previously stripped by the sanitiser and such images were silently skipped.
+- A chart embedded as an `<iframe>` is deleted by Readability before the image pipeline runs. **Flourish
+  embeds are recovered**: the iframe is swapped for Flourish's own static render of the same visualisation
+  and downloaded like any other image, which also makes it work on a Kindle, where an iframe never would.
+  Embeds from other providers cannot be recovered yet - replacing one would mean guessing a static-image URL,
+  and a wrong guess is worse than dropping the embed.
+- A custom element such as `<ft-chart>` is dropped by DOMPurify, and a chart drawn inside a shadow root never
+  reaches the capture at all, because `outerHTML` has no shadow root to serialise. Inline `<svg>` and
+  `<canvas>` survive both stages.
 
 Every capture writes one `Graphics census` log line with the `img`, `picture`, `srcset`, `svg`, `canvas`,
 `iframe`, `figure` and custom-element counts before extraction, after Readability and after sanitising

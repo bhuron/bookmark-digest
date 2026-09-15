@@ -117,6 +117,7 @@ backend/src/
     ├── placeholders.js   # Detect .env.example sentinel values
     ├── filePermissions.js # 0600 on secrets (API key, env file, database)
     ├── ftsQuery.js       # Safe FTS5 MATCH expressions
+    ├── embedImage.js     # Chart embed -> provider's static image
     └── spaRoutes.js      # Paths the SPA fallback must not swallow
 ```
 
@@ -172,8 +173,19 @@ extension's capture, one that disappears between `raw` and `extracted` was dropp
 between `extracted` and `sanitized` was dropped by our own sanitiser. Two limits are built in and show up
 here rather than silently: Readability itself discards `<iframe>` (an embedded chart is gone before we see
 it), and DOMPurify discards custom elements such as `<ft-chart>`. Inline `<svg>` and `<canvas>` survive both
-stages. A chart a site renders inside a shadow root never appears in any census, because `outerHTML` has no
-shadow root to serialise.
+stages - an `<svg>` inside a `<figure>` survives extraction, one inside a bare `<div>` does not. A chart a
+site renders inside a shadow root never appears in any census, because `outerHTML` has no shadow root to
+serialise.
+
+Because Readability deletes every iframe inside the article body, a chart **embed** is converted to an image
+before extraction, by `utils/embedImage.js` and `_replaceEmbedsWithImages` in `articleProcessor`. The
+provider's own static render of the same visualisation replaces the iframe, so the chart then survives
+extraction, sanitising and download, and renders both in the reader and on a Kindle, where an iframe never
+would. Providers are matched exactly, host and path: `flo.uri.sh/visualisation/<id>/embed`, and the
+`visualisation/<id>` wrapper a not-yet-rendered embed leaves behind, both map to
+`public.flourish.studio/visualisation/<id>/thumbnail` (a fixed 1020px-wide render). An unrecognised provider
+is deliberately left alone - guessing a static-image URL would replace a working embed with a broken image,
+which is worse than the embed being dropped - so adding one is a single entry in that module.
 
 The census counts a loss, not the thing lost, so `DEBUG_SAVE_RAW_HTML=true` also writes each capture
 verbatim to `backend/data/raw-captures/<title>-<url-hash>.html` before extraction. That file is the only surviving
@@ -292,6 +304,9 @@ Services like `articleProcessor`, `epubGenerator`, `kindleService` use the singl
 - Images are stored under `backend/images/<title-slug>-<url-hash>/` and served at `/images/...`
 - The directory name includes a hash of the article URL, so two articles with the same title cannot collide
 - URLs in article HTML are replaced with local paths recorded in `article_images`
+- A chart embedded as an iframe is first turned into the provider's static image (`utils/embedImage.js`), so
+  it becomes an ordinary download rather than being deleted by Readability. The substituted `<img>` carries
+  `data-bd-embed="<provider>:<id>"` for provenance
 - `srcset` and `sizes` are in the sanitiser's `ALLOWED_ATTR` on purpose: passing `ALLOWED_ATTR` replaces
   DOMPurify's defaults, and a responsive image often carries its only URL in `srcset`. Losing the attribute
   there is silent and permanent, because the downloader only ever sees the sanitised HTML
