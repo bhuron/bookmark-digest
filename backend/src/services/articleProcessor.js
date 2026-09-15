@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { getConnection } from '../database/index.js';
 import imageHandler from './imageHandler.js';
 import logger from '../utils/logger.js';
+import { staticImageForEmbed } from '../utils/embedImage.js';
 import { getConfig } from '../config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,6 +59,17 @@ class ArticleProcessor {
     } catch (error) {
       logger.error('JSDOM parsing failed', { url, error: error.message });
       throw new Error(`Failed to parse HTML: ${error.message}`);
+    }
+
+    // Chart embeds have to become images before Readability sees them, or they
+    // are deleted with every other iframe inside the article body
+    const replacedEmbeds = this._replaceEmbedsWithImages(dom.window.document);
+
+    if (replacedEmbeds.length > 0) {
+      logger.info('Chart embeds replaced with static images', {
+        url,
+        embeds: replacedEmbeds.map(embed => `${embed.provider}:${embed.id}`)
+      });
     }
 
     // Readability strips the document it parses as it harvests, so the raw
@@ -162,6 +174,63 @@ class ArticleProcessor {
       imageCount: imageData.length,
       images: imageData
     };
+  }
+
+  /**
+   * Replace a chart embedded as an iframe with the provider's static image
+   *
+   * Runs before extraction, because Readability deletes every iframe inside the
+   * article body and an iframe could never render on a Kindle either. An image
+   * survives extraction, sanitising and download, and shows up in the reader and
+   * in an EPUB alike.
+   *
+   * @param {Document} doc - Parsed capture, modified in place
+   * @returns {object[]} - The static images that were substituted in
+   */
+  _replaceEmbedsWithImages(doc) {
+    const replaced = [];
+
+    const swap = (target, image, { append = false } = {}) => {
+      const img = doc.createElement('img');
+
+      img.setAttribute('src', image.url);
+      img.setAttribute('data-bd-embed', `${image.provider}:${image.id}`);
+
+      const title = target.getAttribute && target.getAttribute('title');
+      img.setAttribute('alt', title && title.trim() ? title.trim() : 'Chart');
+
+      if (append) {
+        target.appendChild(img);
+      } else {
+        target.replaceWith(img);
+      }
+
+      replaced.push(image);
+    };
+
+    // The provider's script already ran, so the wrapper holds an iframe
+    for (const iframe of Array.from(doc.querySelectorAll('iframe[src]'))) {
+      const image = staticImageForEmbed([iframe.getAttribute('src')]);
+
+      if (image) {
+        swap(iframe, image);
+      }
+    }
+
+    // The script never ran, so only the wrapper made it into the capture
+    for (const wrapper of Array.from(doc.querySelectorAll('.flourish-embed[data-src]'))) {
+      if (wrapper.querySelector('[data-bd-embed]')) {
+        continue;
+      }
+
+      const image = staticImageForEmbed([wrapper.getAttribute('data-src')]);
+
+      if (image) {
+        swap(wrapper, image, { append: true });
+      }
+    }
+
+    return replaced;
   }
 
   /**

@@ -1,6 +1,7 @@
-import { describe, it, expect, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { JSDOM } from 'jsdom';
 import fs from 'fs/promises';
+import path from 'path';
 import articleProcessor from '../articleProcessor.js';
 
 describe('ArticleProcessor', () => {
@@ -220,12 +221,19 @@ describe('ArticleProcessor', () => {
     });
 
     describe('raw capture dump', () => {
-      const dumpDir = articleProcessor.rawCaptureDir;
+      // A capture kept for diagnosis is someone's evidence, so the tests write
+      // into a directory of their own and never remove the real one
+      const dumpDir = path.join(articleProcessor.rawCaptureDir, 'test-dumps');
       const dumpHtml = '<html><head><title>Dump Test</title></head><body><article>' +
         `<h1>Dump Test</h1><p>${longText}</p><iframe src="/chart"></iframe></article></body></html>`;
 
+      beforeEach(() => {
+        articleProcessor.rawCaptureDir = dumpDir;
+      });
+
       afterEach(async () => {
         delete process.env.DEBUG_SAVE_RAW_HTML;
+        articleProcessor.rawCaptureDir = path.join(dumpDir, '..');
         await fs.rm(dumpDir, { recursive: true, force: true });
       });
 
@@ -256,6 +264,53 @@ describe('ArticleProcessor', () => {
 
         await expect(fs.readdir(dumpDir)).rejects.toThrow();
       });
+    });
+
+    it('should turn a Flourish chart embed into a downloadable image', async () => {
+      // The regression this guards: Readability deletes every iframe inside the
+      // article body, so these charts used to vanish without a trace
+      const withEmbed = `<html><head><title>Embedded</title></head><body><article>
+        <h1>Embedded</h1>
+        <figure class="n-content-picture"><div class="flourish-embed" data-src="visualisation/30227229?hideSignature">
+          <iframe title="Interactive or visual content" src="https://flo.uri.sh/visualisation/30227229/embed?auto=1"></iframe>
+        </div></figure>
+        <figure class="n-content-picture"><div class="flourish-embed" data-src="visualisation/30226063?hideSignature"></div></figure>
+        <p>${longText}</p></article></body></html>`;
+
+      const result = await articleProcessor.processArticle(
+        withEmbed,
+        'https://example.com/embedded',
+        { preserveImages: false }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.contentHtml).not.toContain('<iframe');
+
+      // Both charts, whether the wrapper had rendered an iframe or not
+      expect(result.contentHtml).toContain(
+        'src="https://public.flourish.studio/visualisation/30227229/thumbnail"'
+      );
+      expect(result.contentHtml).toContain(
+        'src="https://public.flourish.studio/visualisation/30226063/thumbnail"'
+      );
+
+      // One image per chart, and the figure that carried it is still there
+      expect(result.contentHtml.match(/public\.flourish\.studio/g)).toHaveLength(2);
+      expect(result.contentHtml).toContain('<figure');
+    });
+
+    it('should not rewrite an embed no provider claims', async () => {
+      const otherEmbed = `<html><head><title>Other</title></head><body><article>
+        <h1>Other</h1><iframe src="https://example.com/embed/1"></iframe>
+        <p>${longText}</p></article></body></html>`;
+
+      const result = await articleProcessor.processArticle(
+        otherEmbed,
+        'https://example.com/other-embed',
+        { preserveImages: false }
+      );
+
+      expect(result.contentHtml).not.toContain('public.flourish.studio');
     });
   });
 
