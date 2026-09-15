@@ -1,4 +1,5 @@
 import { jest, describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
+import sharp from 'sharp';
 import imageHandler from '../imageHandler.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -456,6 +457,118 @@ describe('ImageHandler', () => {
       expect(first.images[0].localPath).not.toBe(second.images[0].localPath);
 
       global.fetch = undefined;
+    });
+  });
+
+  describe('image format handling', () => {
+    const url = 'https://example.com/format-test';
+    const articleDir = path.join(
+      path.resolve(imageHandler.baseImagesDir),
+      `format-test-${imageHandler._urlHash(url)}`
+    );
+    const html = '<img src="/photo" alt="Photo">';
+
+    let sourceJpeg;
+    let sourceWebp;
+
+    beforeAll(async () => {
+      sourceJpeg = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: '#336699' }
+      }).jpeg().toBuffer();
+
+      sourceWebp = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: '#993366' }
+      }).webp().toBuffer();
+    });
+
+    afterEach(async () => {
+      await fs.rm(articleDir, { recursive: true, force: true });
+      global.fetch = undefined;
+    });
+
+    const fakeResponse = (contentType, body) => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: (header) => (header === 'content-type' ? contentType : null) },
+      arrayBuffer: () => Promise.resolve(body)
+    });
+
+    const readSaved = async (localPath) => {
+      const file = path.join(
+        path.resolve(imageHandler.baseImagesDir),
+        localPath.replace('/images/', '')
+      );
+
+      const buffer = await fs.readFile(file);
+      return { buffer, meta: await sharp(buffer).metadata() };
+    };
+
+    it('should only advertise formats it can also read', () => {
+      // The regression this guards: AVIF was requested in Accept and then
+      // rejected, so every FT image was silently dropped
+      const advertised = imageHandler.acceptHeader
+        .split(',')
+        .filter(part => !part.includes('*'));
+
+      expect(advertised.length).toBeGreaterThan(0);
+      for (const type of advertised) {
+        expect(imageHandler.supportedFormats).toContain(type);
+      }
+    });
+
+    it('should claim AVIF support exactly when sharp can decode it', () => {
+      expect(imageHandler.supportedFormats.includes('image/avif'))
+        .toBe(imageHandler.canDecodeAvif);
+    });
+
+    it('should re-encode a WebP as a real JPEG named .jpg', async () => {
+      global.fetch = jest.fn(() => Promise.resolve(fakeResponse('image/webp', sourceWebp)));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Format Test');
+
+      expect(result.images).toHaveLength(1);
+      expect(result.images[0].localPath).toMatch(/\.jpg$/);
+
+      const saved = await readSaved(result.images[0].localPath);
+      expect(saved.meta.format).toBe('jpeg');
+    });
+
+    it('should store a JPEG as JPEG without asking twice', async () => {
+      global.fetch = jest.fn(() => Promise.resolve(fakeResponse('image/jpeg', sourceJpeg)));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Format Test');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      const saved = await readSaved(result.images[0].localPath);
+      expect(saved.meta.format).toBe('jpeg');
+    });
+
+    it('should retry without modern formats when the first answer is unreadable', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(fakeResponse('image/jxl', Buffer.from('unsupported')))
+        .mockResolvedValueOnce(fakeResponse('image/jpeg', sourceJpeg));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Format Test');
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch.mock.calls[1][1].headers.Accept)
+        .toBe(imageHandler.fallbackAcceptHeader);
+
+      expect(result.images).toHaveLength(1);
+
+      const saved = await readSaved(result.images[0].localPath);
+      expect(saved.meta.format).toBe('jpeg');
+    });
+
+    it('should skip the image when the retry is unreadable too', async () => {
+      global.fetch = jest.fn(() => Promise.resolve(fakeResponse('image/jxl', Buffer.from('x'))));
+
+      const result = await imageHandler.downloadAndReplaceImages(html, url, 'Format Test');
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result.images).toEqual([]);
     });
   });
 });

@@ -13,9 +13,28 @@ class ImageHandler {
   constructor() {
     this.timeout = parseInt(getConfig('IMAGE_TIMEOUT_MS', 10000));
     this.maxSize = parseInt(getConfig('MAX_IMAGE_SIZE_MB', 5)) * 1024 * 1024;
-    this.supportedFormats = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     this.imageQuality = parseInt(getConfig('IMAGE_QUALITY', 85));
     this.baseImagesDir = path.join(__dirname, '../../images');
+
+    // Formats this build can decode and re-encode to JPEG, in preference order:
+    // the pipeline re-encodes to JPEG whatever arrives, so taking the smallest
+    // source a server offers costs nothing extra. AVIF decoding is a build-time
+    // option of sharp, so it is only claimed where it is really available.
+    this.canDecodeAvif = Boolean(sharp.format.heif?.input?.buffer);
+
+    this.supportedFormats = [
+      ...(this.canDecodeAvif ? ['image/avif'] : []),
+      'image/webp',
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+
+    this.acceptHeader = `${this.supportedFormats.join(',')},image/*;q=0.8`;
+
+    // What to ask for when a server returns something we cannot read: only the
+    // formats every sharp build understands
+    this.fallbackAcceptHeader = 'image/jpeg,image/png,image/gif';
   }
 
   /**
@@ -116,19 +135,49 @@ class ImageHandler {
   /**
    * Get realistic browser headers for image requests
    */
-  _getBrowserHeaders(imageUrl, baseUrl) {
+  _getBrowserHeaders(imageUrl, baseUrl, accept = this.acceptHeader) {
     const urlOrigin = new URL(imageUrl).origin;
     const baseOrigin = new URL(baseUrl).origin;
 
     return {
       'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'Accept': accept,
       'Accept-Language': 'en-US,en;q=0.9',
       'Referer': baseUrl,
       'Sec-Fetch-Dest': 'image',
       'Sec-Fetch-Mode': 'no-cors',
       'Sec-Fetch-Site': urlOrigin === baseOrigin ? 'same-origin' : 'cross-site'
     };
+  }
+
+  /**
+   * True when this build can decode the given content type
+   */
+  _isSupportedFormat(contentType) {
+    return Boolean(contentType) &&
+      this.supportedFormats.some(format => contentType.includes(format));
+  }
+
+  /**
+   * Fetch an image, aborting after the configured timeout
+   */
+  async _fetchImage(imageUrl, baseUrl, accept) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      return await fetch(imageUrl, {
+        signal: controller.signal,
+        headers: this._getBrowserHeaders(imageUrl, baseUrl, accept)
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Download timeout');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   /**
@@ -143,36 +192,36 @@ class ImageHandler {
       throw new Error(`Invalid URL: ${src}: ${error.message}`);
     }
 
-    // Fetch image with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    // CDNs pick the format from Accept. If the answer is something this build
+    // cannot read, ask once more for the formats every build understands rather
+    // than dropping the image.
+    let response = await this._fetchImage(imageUrl, baseUrl, this.acceptHeader);
+    let contentType = response.headers.get('content-type') || '';
 
-    let response;
-    try {
-      response = await fetch(imageUrl, {
-        signal: controller.signal,
-        headers: this._getBrowserHeaders(imageUrl, baseUrl)
+    if (response.ok && !this._isSupportedFormat(contentType)) {
+      logger.debug('Retrying image without the formats we cannot read', {
+        src,
+        contentType
       });
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Download timeout');
+
+      const retry = await this._fetchImage(imageUrl, baseUrl, this.fallbackAcceptHeader);
+      const retryType = retry.headers.get('content-type') || '';
+
+      if (retry.ok && this._isSupportedFormat(retryType)) {
+        response = retry;
+        contentType = retryType;
       }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
     }
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const contentType = response.headers.get('content-type');
     if (!contentType) {
       throw new Error('No content-type header');
     }
 
-    const isSupported = this.supportedFormats.some(f => contentType.includes(f));
-    if (!isSupported) {
+    if (!this._isSupportedFormat(contentType)) {
       throw new Error(`Unsupported format: ${contentType}`);
     }
 
@@ -184,8 +233,10 @@ class ImageHandler {
     // Download image buffer
     let buffer = await response.arrayBuffer();
 
-    // Convert WebP to JPEG for EPUB compatibility
-    if (contentType.includes('webp')) {
+    // Kindle and EPUB want JPEG, so anything that is not already a JPEG or a PNG
+    // is re-encoded here. That also keeps the bytes on disk in agreement with the
+    // .jpg name they are given.
+    if (!contentType.includes('jpeg') && !contentType.includes('png')) {
       buffer = await this._convertToJPEG(Buffer.from(buffer));
     }
 
