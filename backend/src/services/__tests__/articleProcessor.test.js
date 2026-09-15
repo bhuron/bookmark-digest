@@ -1,8 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import { JSDOM } from 'jsdom';
 import fs from 'fs/promises';
 import path from 'path';
 import articleProcessor from '../articleProcessor.js';
+import imageHandler from '../imageHandler.js';
+import { getConnection } from '../../database/index.js';
+import { setupTestDatabase, teardownTestDatabase } from '../../__tests__/utils/testDatabase.js';
 
 describe('ArticleProcessor', () => {
   describe('processArticle', () => {
@@ -325,6 +328,88 @@ describe('ArticleProcessor', () => {
     it('should have saveArticle method', async () => {
       expect(articleProcessor.saveArticle).toBeDefined();
       expect(typeof articleProcessor.saveArticle).toBe('function');
+    });
+
+    describe('images of a repeated capture', () => {
+      const imagesDir = path.resolve(imageHandler.baseImagesDir);
+      const dirName = `recapture-${Date.now()}`;
+      const fields = {
+        url: 'https://example.com/recapture',
+        originalUrl: 'https://example.com/recapture',
+        title: 'Recapture',
+        contentHtml: '<p>Text</p>',
+        contentText: 'Text',
+        excerpt: 'Text',
+        author: null,
+        siteName: null,
+        publishedAt: null,
+        wordCount: 1,
+        readingTimeMinutes: 1,
+        language: 'en',
+        hasImages: true,
+        imageCount: 2
+      };
+
+      const image = (name) => ({
+        originalUrl: `https://example.com/${name}.jpg`,
+        localPath: `/images/${dirName}/${name}.jpg`,
+        altText: name
+      });
+
+      const writeImageFiles = async (names) => {
+        await fs.mkdir(path.join(imagesDir, dirName), { recursive: true });
+
+        for (const name of names) {
+          await fs.writeFile(path.join(imagesDir, dirName, `${name}.jpg`), 'x');
+        }
+      };
+
+      const recordedPaths = () => getConnection()
+        .prepare(`
+          SELECT ai.local_path FROM article_images ai
+          JOIN articles a ON a.id = ai.article_id
+          WHERE a.url = ?
+        `)
+        .all(fields.url)
+        .map(row => row.local_path);
+
+      beforeAll(async () => {
+        await setupTestDatabase('article-processor-save');
+      });
+
+      afterAll(async () => {
+        teardownTestDatabase();
+        await fs.rm(path.join(imagesDir, dirName), { recursive: true, force: true });
+      });
+
+      it('should replace the previous rows and files instead of accumulating', async () => {
+        await writeImageFiles(['one', 'two']);
+        await articleProcessor.saveArticle({
+          ...fields,
+          images: [image('one'), image('two')]
+        });
+
+        expect(recordedPaths().sort()).toEqual([
+          `/images/${dirName}/one.jpg`,
+          `/images/${dirName}/two.jpg`
+        ]);
+
+        // The same URL captured again, with different images
+        await writeImageFiles(['three', 'four']);
+        await articleProcessor.saveArticle({
+          ...fields,
+          images: [image('three'), image('four')]
+        });
+
+        expect(recordedPaths().sort()).toEqual([
+          `/images/${dirName}/four.jpg`,
+          `/images/${dirName}/three.jpg`
+        ]);
+
+        // The files the replaced rows named are gone, not orphaned on disk
+        const onDisk = await fs.readdir(path.join(imagesDir, dirName));
+        expect(onDisk.sort()).toEqual(['four.jpg', 'three.jpg']);
+      });
     });
   });
 });

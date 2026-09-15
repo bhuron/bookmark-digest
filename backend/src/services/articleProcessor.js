@@ -337,9 +337,22 @@ class ArticleProcessor {
    */
   async saveArticle(articleData) {
     const db = getConnection();
+    let replacedImages = [];
 
     try {
-      return db.transaction(() => {
+      const articleId = db.transaction(() => {
+        // A re-capture replaces this article's images rather than adding to them.
+        // The paths are collected before the rows go, because the files are only
+        // removed once the new write has succeeded.
+        replacedImages = db
+          .prepare(`
+            SELECT ai.local_path FROM article_images ai
+            JOIN articles a ON a.id = ai.article_id
+            WHERE a.url = ?
+          `)
+          .all(articleData.url)
+          .map(row => row.local_path);
+
         // Insert or update article
         const articleStmt = db.prepare(`
           INSERT INTO articles
@@ -386,6 +399,9 @@ class ArticleProcessor {
 
         const articleId = result.id;
 
+        // The rows just collected described files this capture has replaced
+        db.prepare('DELETE FROM article_images WHERE article_id = ?').run(articleId);
+
         // Save images
         if (articleData.images && articleData.images.length > 0) {
           this._saveImages(db, articleId, articleData.images);
@@ -401,6 +417,16 @@ class ArticleProcessor {
 
         return articleId;
       })();
+
+      // The previous capture's files are normally gone already, because the
+      // downloader clears the directory it writes to. They survive only when the
+      // title moved the article to a new directory, or when this capture kept no
+      // images at all - and then leaving them behind would orphan them for good
+      if (replacedImages.length > 0) {
+        await imageHandler.deleteImageFiles(replacedImages);
+      }
+
+      return articleId;
     } catch (error) {
       logger.error('Failed to save article', {
         error: error.message,
