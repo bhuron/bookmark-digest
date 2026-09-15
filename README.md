@@ -348,6 +348,12 @@ Every capture writes one `Graphics census` log line with the `img`, `picture`, `
 (`debug` level for ordinary photo-only articles, `info` as soon as something else is present). Comparing the
 three tells you which stage lost the graphic, or that it was never in the capture.
 
+The census counts what a stage dropped, never what it was. To identify the graphics themselves, set
+`DEBUG_SAVE_RAW_HTML=true` (in the root `.env`) and capture the article once more: the untouched HTML is
+written to `data/raw-captures/<title>-<url-hash>.html`, which is the only place the dropped markup still
+exists. The directory is gitignored and the flag is off by default, because each file can be as large as
+`MAX_ARTICLE_SIZE_MB` and holds more than the article.
+
 ### Recent Bug Fixes
 - **Image display** - Fixed missing leading slash in image paths
 - **CSS parsing errors** - Suppressed JSDOM errors with VirtualConsole

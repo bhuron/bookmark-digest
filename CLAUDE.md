@@ -175,6 +175,12 @@ it), and DOMPurify discards custom elements such as `<ft-chart>`. Inline `<svg>`
 stages. A chart a site renders inside a shadow root never appears in any census, because `outerHTML` has no
 shadow root to serialise.
 
+The census counts a loss, not the thing lost, so `DEBUG_SAVE_RAW_HTML=true` also writes each capture
+verbatim to `data/raw-captures/<title>-<url-hash>.html` before extraction. That file is the only surviving
+copy of a graphic Readability or the sanitiser discarded, and it is how the two limits above were
+identified. It is off by default because a capture can be as large as `MAX_ARTICLE_SIZE_MB` and holds more
+than the article; the write is best-effort and can never fail the capture.
+
 ### Database Schema Key Points
 
 - Articles have a unique constraint on `url` (UPSERT on duplicate)

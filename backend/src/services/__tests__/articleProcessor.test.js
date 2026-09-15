@@ -1,5 +1,6 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, afterEach } from '@jest/globals';
 import { JSDOM } from 'jsdom';
+import fs from 'fs/promises';
 import articleProcessor from '../articleProcessor.js';
 
 describe('ArticleProcessor', () => {
@@ -216,6 +217,45 @@ describe('ArticleProcessor', () => {
 
     it('should count nothing for a missing node', () => {
       expect(articleProcessor._graphicsCensus(null).img).toBe(0);
+    });
+
+    describe('raw capture dump', () => {
+      const dumpDir = articleProcessor.rawCaptureDir;
+      const dumpHtml = '<html><head><title>Dump Test</title></head><body><article>' +
+        `<h1>Dump Test</h1><p>${longText}</p><iframe src="/chart"></iframe></article></body></html>`;
+
+      afterEach(async () => {
+        delete process.env.DEBUG_SAVE_RAW_HTML;
+        await fs.rm(dumpDir, { recursive: true, force: true });
+      });
+
+      it('should write the capture when the flag is on', async () => {
+        process.env.DEBUG_SAVE_RAW_HTML = 'true';
+
+        await articleProcessor.processArticle(
+          dumpHtml,
+          'https://example.com/dump-test',
+          { preserveImages: false }
+        );
+
+        const files = await fs.readdir(dumpDir);
+        expect(files).toHaveLength(1);
+        expect(files[0]).toMatch(/^dump-test-[0-9a-f]{10}\.html$/);
+
+        // Verbatim, so the iframe Readability is about to drop is still readable
+        const saved = await fs.readFile(`${dumpDir}/${files[0]}`, 'utf8');
+        expect(saved).toContain('<iframe src="/chart">');
+      });
+
+      it('should write nothing unless asked', async () => {
+        await articleProcessor.processArticle(
+          dumpHtml,
+          'https://example.com/dump-test',
+          { preserveImages: false }
+        );
+
+        await expect(fs.readdir(dumpDir)).rejects.toThrow();
+      });
     });
   });
 

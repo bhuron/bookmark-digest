@@ -1,9 +1,19 @@
 import { Readability } from '@mozilla/readability';
 import { JSDOM, VirtualConsole } from 'jsdom';
 import createDOMPurify from 'dompurify';
+import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getConnection } from '../database/index.js';
 import imageHandler from './imageHandler.js';
 import logger from '../utils/logger.js';
+import { getConfig } from '../config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const TRUE_VALUES = ['true', '1', 'yes', 'on'];
 
 class ArticleProcessor {
   constructor() {
@@ -17,6 +27,11 @@ class ArticleProcessor {
     // Size limits
     this.MAX_HTML_SIZE = 10 * 1024 * 1024; // 10MB
     this.MAX_ARTICLE_LENGTH = 500000; // 500K chars
+
+    // Where a capture is kept verbatim when DEBUG_SAVE_RAW_HTML is on. Under the
+    // gitignored data directory, and never next to the images, which are served
+    // over HTTP
+    this.rawCaptureDir = path.join(__dirname, '../../data/raw-captures');
   }
 
   /**
@@ -56,6 +71,8 @@ class ArticleProcessor {
     if (!article) {
       logger.warn('Readability failed to extract article', { url });
 
+      await this._saveRawCapture(html, url, dom.window.document.title);
+
       // Return failure with original HTML for manual review
       return {
         success: false,
@@ -65,6 +82,8 @@ class ArticleProcessor {
         title: dom.window.document.title || 'Untitled'
       };
     }
+
+    await this._saveRawCapture(html, url, article.title);
 
     // Validate article length
     if (article.content.length > this.MAX_ARTICLE_LENGTH) {
@@ -143,6 +162,42 @@ class ArticleProcessor {
       imageCount: imageData.length,
       images: imageData
     };
+  }
+
+  /**
+   * Keep the untouched capture when DEBUG_SAVE_RAW_HTML is on
+   *
+   * The census says how many graphics a stage lost, never which ones. A chart
+   * that Readability or the sanitiser discarded is only identifiable in the
+   * original capture, so this writes it out verbatim to be inspected afterwards.
+   *
+   * Best-effort by design: a diagnostic must never fail the capture it describes.
+   *
+   * @param {string} html - Raw capture as received
+   * @param {string} url - Article URL
+   * @param {string} title - Extracted title, used for the file name
+   */
+  async _saveRawCapture(html, url, title) {
+    if (!TRUE_VALUES.includes(String(getConfig('DEBUG_SAVE_RAW_HTML', 'false')).toLowerCase())) {
+      return;
+    }
+
+    const slug = String(title || 'capture')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 50) || 'capture';
+
+    const hash = crypto.createHash('sha256').update(String(url || '')).digest('hex').slice(0, 10);
+    const file = path.join(this.rawCaptureDir, `${slug}-${hash}.html`);
+
+    try {
+      await fs.mkdir(this.rawCaptureDir, { recursive: true });
+      await fs.writeFile(file, html);
+      logger.info('Raw capture saved', { url, file, bytes: html.length });
+    } catch (error) {
+      logger.warn('Failed to save raw capture', { url, error: error.message });
+    }
   }
 
   /**

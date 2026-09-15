@@ -34,6 +34,7 @@ const CONFIG_SCHEMA = {
   IMAGE_QUALITY: { type: 'int', default: 85, min: 1, max: 100 },
   IMAGE_TIMEOUT_MS: { type: 'int', default: 10000, min: 100, max: 600000 },
   MAX_ARTICLE_SIZE_MB: { type: 'number', default: 10, min: 0.1, max: 100 },
+  DEBUG_SAVE_RAW_HTML: { type: 'bool', default: false },
   API_RATE_LIMIT: { type: 'int', default: 100, min: 1, max: 1000000 },
   CORS_ORIGIN: { type: 'string', default: 'http://localhost:5174' },
   KINDLE_EMAIL: { type: 'string', default: '' },
