@@ -406,6 +406,22 @@ rm config.json
 cd backend && npm start
 ```
 
+### "Browserslist: browsers data (caniuse-lite) is N months old"
+
+Run the update from the project that owns the dependency, not from the repository root:
+
+```bash
+cd frontend && npx update-browserslist-db@latest
+```
+
+`caniuse-lite` is a transitive dependency of autoprefixer, which the Vite build in `frontend/` uses. The
+root `package.json` holds only `concurrently` and `pm2`, so `caniuse-lite` is not installed there and the
+tool has nothing to update - which is why running it from the root leaves the warning in place.
+
+The warning is cosmetic. The data only tells autoprefixer which vendor prefixes to emit, and refreshing it
+changes that output only if the browserslist targets have actually moved. The tool prints "No target browser
+changes" when they have not.
+
 ## Continuous Integration
 
 `.github/workflows/ci.yml` runs the same checks on every push and pull request to `master`:
