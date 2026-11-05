@@ -169,7 +169,7 @@ export default function Settings() {
                   <svg className="w-4 h-4 text-gallery-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 16.5L9 21m0 0l-4.5-4.5M9 21V9a2.25 2.25 0 012.25-2.25h5.25A2.25 2.25 0 0118.5 9v12" />
                   </svg>
-                  Found in <code className="bg-gallery-100 px-2 py-0.5 rounded text-xs font-mono text-gallery-700">backend/config.json</code>
+                  Found in <code className="bg-gallery-100 px-2 py-0.5 rounded text-xs font-mono text-gallery-700">config.json</code> at the repository root
                 </p>
               </div>
 

@@ -42,7 +42,8 @@ A local, self-hosted bookmarking and reading digest service that extracts web ar
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+ (Note: Node.js 24 may have compatibility issues with some native modules)
+- Node.js 22, 24, or 26 (Node 26 LTS recommended). Node 18/20 are not supported: `better-sqlite3` 13
+  requires Node 22+, and `@lesjoursfr/html-to-epub` allows 22, 24 and 26.
 - npm or yarn
 
 ### Start everything from the root
@@ -302,6 +303,37 @@ SMTP_PASSWORD=your_app_password
 CORS_ORIGIN=http://localhost:5174
 ```
 
+## Kindle Delivery (Gmail SMTP)
+
+EPUBs are emailed to your Kindle over SMTP. Configure it in the UI under **Settings → Kindle Email
+Configuration**, or in the root `.env`. UI settings are stored in the database and take precedence over
+`.env`; UI changes apply immediately, while `.env` changes need a backend restart. The placeholder values
+from `.env.example` are recognised and ignored, so the feature stays unconfigured until real values are
+entered.
+
+Gmail values:
+
+| Field | Value |
+| --- | --- |
+| Kindle Email Address | `name@kindle.com` — find it at Amazon → Manage Your Content and Devices → Preferences → Send to Kindle Email Settings |
+| SMTP Host | `smtp.gmail.com` |
+| SMTP Port | `587` (or `465` with SSL/TLS selected) |
+| Security | `STARTTLS` for port 587, `SSL/TLS` for port 465 |
+| SMTP Username | your full Gmail address |
+| SMTP Password | a 16-character Google **App Password**, not your normal Google password |
+| From Email | leave empty — it defaults to the SMTP username |
+
+Gmail no longer accepts an account password for SMTP. Create an App Password at Google Account → Security
+→ 2-Step Verification (must be enabled) → App passwords, and paste the 16 characters without spaces.
+
+Also approve the sender on Amazon, or it rejects the document: Manage Your Content and Devices →
+Preferences → Personal Document Settings → Approved Personal Document E-mail List → add the Gmail address
+you send from.
+
+Then click **Test SMTP** (this only checks the SMTP login), generate an EPUB, and use the Kindle button in
+the export list to send it. The password field is blank whenever the page loads, so re-enter the App
+Password each time you save the form.
+
 ## Development
 
 ### Backend
@@ -314,6 +346,11 @@ npm run migrate         # Run database migrations manually
 npm run lint            # Run ESLint
 npm test                # Run Jest tests
 ```
+
+> `backend/.npmrc` sets `ignore-scripts=true`. `better-sqlite3` 13 ships a prebuilt N-API binary, but
+> npm 11 still runs `node-gyp rebuild` for it on a fresh tree, which needs a C++ toolchain and Node
+> headers. No backend dependency needs an install script (`sharp` gets its binary from optional
+> dependencies), so skipping them keeps `npm install` and `npm ci` working on any supported Node.
 
 ### Frontend
 ```bash
