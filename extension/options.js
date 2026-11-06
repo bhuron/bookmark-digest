@@ -1,7 +1,13 @@
 // Options page JavaScript for Bookmark Digest extension
+//
+// `browser` is Firefox's promise-based namespace; Chrome exposes only `chrome`,
+// whose MV3 methods also return promises when called without a callback.
+const api = globalThis.browser ?? globalThis.chrome;
 
 const API_BASE = 'http://localhost:3001';
 const STORAGE_KEY_API = 'bookmarkDigestApiKey';
+// Firefox match patterns cannot contain a port, so this covers :3001 too.
+const HOST_ORIGIN = 'http://localhost/*';
 
 
 // DOM elements
@@ -20,7 +26,7 @@ const footerVersionElement = document.getElementById('footer-version');
  */
 async function init() {
   // Set version from manifest
-  const manifest = chrome.runtime.getManifest();
+  const manifest = api.runtime.getManifest();
   const version = manifest.version;
   versionElement.textContent = version;
   footerVersionElement.textContent = version;
@@ -39,33 +45,40 @@ async function init() {
 }
 
 /**
- * Load settings from chrome.storage
+ * Load settings from extension storage
  */
 async function loadSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEY_API], (result) => {
-      const apiKey = result[STORAGE_KEY_API] || '';
-      apiKeyInput.value = apiKey;
-      resolve();
-    });
+  const result = await api.storage.local.get([STORAGE_KEY_API]);
+  apiKeyInput.value = result[STORAGE_KEY_API] || '';
+}
+
+/**
+ * Save settings to extension storage
+ */
+async function saveSettings(apiKey) {
+  await api.storage.local.set({
+    [STORAGE_KEY_API]: apiKey
   });
 }
 
 /**
- * Save settings to chrome.storage
+ * Firefox treats host permissions as optional, and users can revoke them.
+ * Ask from this click (a user gesture) when access is missing. Requesting an
+ * origin that is already granted resolves immediately without a prompt.
+ * Chrome grants host_permissions at install, and its permissions API is
+ * callback-based in MV3, so this is Firefox-only.
  */
-async function saveSettings(apiKey) {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.set({
-      [STORAGE_KEY_API]: apiKey
-    }, () => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve();
-      }
-    });
-  });
+async function ensureHostPermission() {
+  if (!globalThis.browser) {
+    return true;
+  }
+
+  try {
+    return await api.permissions.request({ origins: [HOST_ORIGIN] });
+  } catch (error) {
+    console.warn('Could not check localhost permission:', error);
+    return true;
+  }
 }
 
 /**
@@ -150,6 +163,18 @@ async function handleTest() {
   }
 
   hideStatus();
+
+  // Must run before any await inside this click handler, or Firefox drops the
+  // user-gesture requirement for permissions.request().
+  const hostGranted = await ensureHostPermission();
+  if (!hostGranted) {
+    showStatus(
+      'Localhost access was not granted. Enable it in about:addons → Bookmark Digest → Permissions.',
+      'error'
+    );
+    return;
+  }
+
   setButtonLoading(testBtn, true);
 
   try {
@@ -202,15 +227,7 @@ async function handleTest() {
  * Send message to background script
  */
 function sendMessage(action, data = {}) {
-  return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage({ action, ...data }, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(chrome.runtime.lastError);
-      } else {
-        resolve(response);
-      }
-    });
-  });
+  return api.runtime.sendMessage({ action, ...data });
 }
 
 // Initialize on DOM content loaded

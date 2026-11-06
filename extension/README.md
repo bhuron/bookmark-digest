@@ -1,6 +1,30 @@
 # Bookmark Digest Browser Extension
 
-Manifest V3 browser extension for capturing web articles and saving them to your local Bookmark Digest backend.
+Manifest V3 browser extension for capturing web articles and saving them to your local Bookmark Digest
+backend. It runs in Chromium browsers (Chrome, Edge) and in Firefox-based browsers (Firefox 128+, Zen).
+
+## Installation
+
+### Chrome / Edge
+
+1. Open `chrome://extensions/`
+2. Enable **Developer Mode**
+3. Click **Load unpacked** and select the `extension/` folder
+
+### Firefox / Zen
+
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on…**
+3. Select `extension/manifest.json`
+
+Temporary add-ons disappear when the browser restarts. For a permanent install, package the folder
+(`npx web-ext build --source-dir extension`) and either sign the result as an unlisted add-on on
+[addons.mozilla.org](https://addons.mozilla.org/developers/) or load the unsigned XPI in a build that
+accepts it (Developer Edition and Nightly do; release Firefox requires a signature).
+
+Firefox 128 or newer is required: the manifest declares both `background.service_worker` (Chrome) and
+`background.scripts` (Firefox), and the `data_collection_permissions` block used for AMO signing is
+rejected outright by Firefox 127 and older.
 
 ## Features
 
@@ -9,20 +33,6 @@ Manifest V3 browser extension for capturing web articles and saving them to your
 - **API Key Authentication**: Secure communication with backend
 - **Connection Testing**: Verify backend connectivity from options page
 - **Status Feedback**: A colored toolbar badge shows capturing / processing / saved / failed (see [Known Limitations](#known-limitations))
-
-## Installation
-
-### Load Unpacked Extension (Chrome/Edge)
-
-1. Open your browser and navigate to:
-   - Chrome/Edge: `chrome://extensions/`
-   - Firefox: `about:debugging#/runtime/this-firefox`
-
-2. Enable **Developer Mode** (toggle in top right)
-
-3. Click **Load unpacked**
-
-4. Navigate to and select the `extension/` folder in this project
 
 ## Configuration
 
@@ -43,8 +53,9 @@ Manifest V3 browser extension for capturing web articles and saving them to your
    - The server generates an API key automatically on first run and prints it to the console
    - Find it in `config.json` at the **repository root** (not `backend/config.json`)
 
-3. **Configure Extension**:
-   - Right-click the extension icon → **Options**
+3. **Configure Extension** (the options page also opens automatically on first install):
+   - Chrome/Edge: right-click the extension icon → **Options**
+   - Firefox/Zen: `about:addons` → Bookmark Digest → **Preferences**
    - Paste your API key
    - Click **Save Settings**
    - Click **Test Connection** to verify
@@ -53,10 +64,13 @@ Manifest V3 browser extension for capturing web articles and saving them to your
 
 The extension connects to `http://localhost:3001` by default. To change this:
 
-1. Edit `extension/manifest.json`
-2. Update the `host_permissions` array
-3. Update the `API_BASE` constant in `extension/background.js`
-4. Reload the extension
+1. Update the `host_permissions` array in `extension/manifest.json`
+2. Update the `API_BASE` constant in `extension/background.js` (saving) **and**
+   `extension/options.js` (the options page's connection test)
+3. Reload the extension
+
+Firefox match patterns cannot include a port, so `host_permissions` must be `http://localhost/*` (or
+`http://your-host/*`); the port belongs only in `API_BASE`.
 
 ## Usage
 
@@ -84,6 +98,17 @@ Currently, saved articles can be accessed via:
 1. Right-click extension icon → Options
 2. Paste the API key from `config.json` at the repository root
 3. Save settings
+
+#### "Connection failed" while the backend is running (Firefox)
+
+**Cause**: Firefox ignores host permissions that contain a port. With `http://localhost:3001/*` in
+`host_permissions`, the extension has no cross-origin access, and `fetch` fails with a CORS/NetworkError
+even though the server is up.
+
+**Solution**:
+1. Use `http://localhost/*` in `host_permissions` (no port); keep `http://localhost:3001` in `API_BASE`
+2. Reload the temporary add-on in `about:debugging`
+3. Check `about:addons` → Bookmark Digest → **Permissions** that localhost access is enabled
 
 #### "Server is not running" Error
 
@@ -118,7 +143,7 @@ npm run dev
 ```
 extension/
 ├── manifest.json          # Extension configuration (Manifest V3)
-├── background.js          # Service worker (main logic)
+├── background.js          # Background script (service worker in Chrome, event page in Firefox)
 ├── content.js            # Content script utilities
 ├── options.html          # Settings page UI
 ├── options.js            # Settings page logic
@@ -136,7 +161,10 @@ The extension requires the following permissions:
 
 - **activeTab**: Access the current tab's content
 - **scripting**: Inject scripts to capture page content
-- **storage**: Save API key in local storage
+- **storage**: Save API key in extension storage
+- **host_permissions** (`http://localhost/*`): Talk to the local backend. Firefox shows this in the
+  install prompt and users can revoke it from the extensions panel. Match patterns cannot contain a port
+  in Firefox, so the port lives only in `API_BASE`.
 
 ## Architecture
 
@@ -153,44 +181,31 @@ The extension requires the following permissions:
 
 ### Communication
 
-- **Background → Content Script**: `chrome.scripting.executeScript()`
-- **Options → Background**: `chrome.runtime.sendMessage()`
+- **Background → Content Script**: `api.scripting.executeScript()`
+- **Options → Background**: `api.runtime.sendMessage()`
 - **Background → Backend**: `fetch()` with API key header
+
+`api` is `browser` when it exists (Firefox) and `chrome` otherwise. Both are used in their
+promise-returning form, which Chrome MV3 supports when no callback is passed.
 
 ## Icons
 
-The extension includes placeholder icons. For production use, replace with custom icons:
+The PNGs are generated from `extension/icons/icon.svg` with the backend's sharp dependency:
 
-### Option 1: Online Converter
-1. Visit https://cloudconvert.com/svg-to-png
-2. Upload `extension/icons/icon.svg`
-3. Convert at 16x16, 48x48, and 128x128
-4. Replace the placeholder PNG files
-
-### Option 2: ImageMagick
 ```bash
-cd extension/icons
-convert icon.svg -resize 16x16 icon16.png
-convert icon.svg -resize 48x48 icon48.png
-convert icon.svg -resize 128x128 icon128.png
+npm run icons
 ```
 
-### Option 3: Sharp (Node.js)
-```bash
-cd backend
-npx sharp ../extension/icons/icon.svg -resize 16 ../extension/icons/icon16.png
-npx sharp ../extension/icons/icon.svg -resize 48 ../extension/icons/icon48.png
-npx sharp ../extension/icons/icon.svg -resize 128 ../extension/icons/icon128.png
-```
+Edit the SVG, then re-run that command. The committed PNGs are already generated, so this is only
+needed when the artwork changes.
 
 ## Development
 
 ### Debugging
 
 **Background Script**:
-1. Go to `chrome://extensions/`
-2. Find "Bookmark Digest"
-3. Click "Service worker" to open DevTools
+- Chrome/Edge: `chrome://extensions/` → Bookmark Digest → **Service worker**
+- Firefox/Zen: `about:debugging#/runtime/this-firefox` → Bookmark Digest → **Inspect**
 
 **Options Page**:
 1. Right-click extension icon → Options
@@ -203,32 +218,30 @@ npx sharp ../extension/icons/icon.svg -resize 128 ../extension/icons/icon128.png
 
 ### Reloading After Changes
 
-1. Go to `chrome://extensions/`
-2. Find "Bookmark Digest"
-3. Click the refresh icon 🔄
+- Chrome/Edge: `chrome://extensions/` → refresh icon 🔄
+- Firefox/Zen: `about:debugging#/runtime/this-firefox` → **Reload** (temporary add-ons)
 
 ### Console Logs
 
 The extension logs to:
-- Background script: Extension service worker console
+- Background script: service worker console (Chrome) / event page console (Firefox)
 - Content script: Page console (when saving)
 - Options page: Options page console
 
 ## Browser Compatibility
 
-- ✅ Chrome/Edge (Manifest V3)
-- ⚠️ Firefox (Manifest V3 support in progress)
-- ❌ Safari (Manifest V3 not supported)
+- ✅ Chrome/Edge 121+ (Manifest V3, service worker background)
+- ✅ Firefox 121+ (Manifest V3, event page background)
+- ✅ Zen and other Firefox derivatives (same engine and manifest)
+- ❌ Safari (uses a different extension format)
 
 ## Known Limitations
 
 - **In-page toasts do not render.** `background.js` calls `window.bdToast.show()`, but `window.bdToast` is never defined and `content.js` is neither declared in `manifest.json` nor injected, so only the toolbar badge appears. `content.js` is currently inert.
-- **Icons are 1×1 placeholders.** `extension/icons/icon{16,48,128}.png` are 1×1 PNGs; regenerate them (see [Icons](#icons)) for real artwork.
-- **Firefox MV3 support is partial.** `manifest.json` declares `background.service_worker`, whereas Firefox expects `background.scripts`.
 
 ## Security
 
-- API keys stored in `chrome.storage.local` (not synced)
+- API keys stored in extension storage (`storage.local`, not synced)
 - HTTPS not required for localhost
 - No third-party tracking or analytics
 - No data sent to external servers

@@ -1,28 +1,32 @@
-// Background service worker for Bookmark Digest extension
+// Background script for Bookmark Digest.
+//
+// Chrome runs this as a Manifest V3 service worker; Firefox runs it as an event
+// page, because Firefox does not implement background.service_worker. The
+// manifest declares both `service_worker` and `scripts`: Chrome 121+ ignores
+// `scripts`, and Firefox ignores `service_worker`.
+//
+// `browser` is Firefox's promise-based namespace. Chrome only exposes `chrome`,
+// whose MV3 methods also return promises when called without a callback, so the
+// same `await` works in both browsers.
+
+const api = globalThis.browser ?? globalThis.chrome;
 
 const API_BASE = 'http://localhost:3001/api';
 const STORAGE_KEY_API = 'bookmarkDigestApiKey';
 
 /**
- * Get API key from chrome.storage
+ * Get API key from extension storage
  */
 async function getApiKey() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEY_API], (result) => {
-      resolve(result[STORAGE_KEY_API] || '');
-    });
-  });
+  const result = await api.storage.local.get([STORAGE_KEY_API]);
+  return result[STORAGE_KEY_API] || '';
 }
 
 /**
- * Save API key to chrome.storage
+ * Save API key to extension storage
  */
 async function saveApiKey(apiKey) {
-  return new Promise((resolve) => {
-    chrome.storage.local.set({ [STORAGE_KEY_API]: apiKey }, () => {
-      resolve();
-    });
-  });
+  await api.storage.local.set({ [STORAGE_KEY_API]: apiKey });
 }
 
 /**
@@ -31,11 +35,11 @@ async function saveApiKey(apiKey) {
  */
 function setBadge(color) {
   // Use a single dot as badge, color indicates status
-  chrome.action.setBadgeText({ text: '•' });
-  chrome.action.setBadgeBackgroundColor({ color });
+  api.action.setBadgeText({ text: '•' });
+  api.action.setBadgeBackgroundColor({ color });
   // Clear badge after 3 seconds
   setTimeout(() => {
-    chrome.action.setBadgeText({ text: '' });
+    api.action.setBadgeText({ text: '' });
   }, 3000);
 }
 
@@ -44,7 +48,7 @@ function setBadge(color) {
  */
 async function showToast(tabId, options) {
   try {
-    await chrome.scripting.executeScript({
+    await api.scripting.executeScript({
       target: { tabId },
       func: (toastOptions) => {
         if (window.bdToast) {
@@ -88,7 +92,7 @@ async function testConnection(apiKey) {
 async function capturePage(tab) {
   try {
     // Inject content script programmatically
-    const results = await chrome.scripting.executeScript({
+    const results = await api.scripting.executeScript({
       target: { tabId: tab.id },
       func: capturePageContent,
     });
@@ -191,7 +195,7 @@ async function saveArticle(data) {
 /**
  * Handle extension icon click
  */
-chrome.action.onClicked.addListener(async (tab) => {
+api.action.onClicked.addListener(async (tab) => {
   try {
     // Check if API key is configured
     const apiKey = await getApiKey();
@@ -252,8 +256,8 @@ chrome.action.onClicked.addListener(async (tab) => {
       hintMessage = 'Set your API key in extension options.';
     } else if (errorMessage.includes('Invalid API key')) {
       hintMessage = 'Check your API key in extension options.';
-    } else if (errorMessage.includes('Server is not running') || errorMessage.includes('fetch')) {
-      hintMessage = 'Make sure the backend server is running.';
+    } else if (errorMessage.includes('Server is not running') || errorMessage.includes('fetch') || errorMessage.includes('NetworkError')) {
+      hintMessage = 'Make sure the backend is running and that the extension may access localhost (about:addons -> Permissions).';
     } else if (errorMessage.includes('Failed to capture')) {
       hintMessage = 'Try refreshing the page and clicking again.';
     }
@@ -269,19 +273,19 @@ chrome.action.onClicked.addListener(async (tab) => {
 /**
  * Handle installation/update
  */
-chrome.runtime.onInstalled.addListener((details) => {
+api.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     // First install - open options page
-    chrome.runtime.openOptionsPage();
+    api.runtime.openOptionsPage();
   } else if (details.reason === 'update') {
-    console.log('Extension updated to version:', chrome.runtime.getManifest().version);
+    console.log('Extension updated to version:', api.runtime.getManifest().version);
   }
 });
 
 /**
  * Message handler for options page communication
  */
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getApiKey') {
     getApiKey().then(sendResponse);
     return true; // Keep message channel open for async response
@@ -300,7 +304,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'openOptions') {
-    chrome.runtime.openOptionsPage();
+    api.runtime.openOptionsPage();
     sendResponse({ success: true });
     return true;
   }

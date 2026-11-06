@@ -342,14 +342,14 @@ carry a search term and stay index-backed.
 The browser extension is **fully implemented** in the `/extension` directory.
 
 ### Extension Architecture
-- **Manifest V3** with `activeTab`, `scripting`, `storage` permissions
+- **Manifest V3** with `activeTab`, `scripting`, `storage` and `http://localhost/*` host permissions (Firefox rejects ports in match patterns; the port lives in `API_BASE`); runs in Chrome/Edge and Firefox/Zen from one manifest
 - **Programmatic script injection** - content script injected on button click, not declaratively
-- **API key storage** via `chrome.storage`
-- **Options page** for configuration (backend URL, API key)
+- **API key storage** via extension storage (`storage.local`)
+- **Options page** for configuration (API key, connection test)
 
 ### Extension Files
 - `manifest.json` - Extension configuration
-- `background.js` - Service worker, handles extension icon clicks and performs the capture via `chrome.scripting.executeScript`
+- `background.js` - Background script: a service worker in Chrome, an event page in Firefox (the manifest declares both). Uses `const api = globalThis.browser ?? globalThis.chrome` and promise-returning calls, so it runs in both; performs the capture via `api.scripting.executeScript`
 - `content.js` - Inert: not declared in `manifest.json` and never injected; the capture function is injected inline from `background.js`
 - `options.html` + `options.js` - Settings page
 

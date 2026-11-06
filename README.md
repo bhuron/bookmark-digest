@@ -102,19 +102,15 @@ and `:3001`.
 
 ### Browser Extension Installation
 
-1. Open your browser's extension management page:
-   - Chrome: `chrome://extensions`
-   - Firefox: `about:debugging#/runtime/this-firefox`
+- **Chrome/Edge:** open `chrome://extensions`, enable **Developer Mode**, click **Load unpacked** and
+  select the `extension/` directory.
+- **Firefox/Zen:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…** and
+  select `extension/manifest.json`.
 
-2. Enable **Developer Mode**
-
-3. Click **Load unpacked** and select the `/extension` directory
-
-4. Click the extension icon to configure:
-   - Set the Backend URL (default: `http://localhost:3001`)
-   - Enter your API key (from `config.json` at the repository root)
-
-5. Test by clicking the extension icon on any article page
+The options page opens after the first install: paste the API key from `config.json` (repository root).
+The backend URL is fixed to `http://localhost:3001` in the manifest; if your backend runs elsewhere,
+change `host_permissions` and the `API_BASE` constants (Firefox match patterns cannot contain a port, so use `http://localhost/*`). Temporary add-ons disappear when Firefox or Zen
+restarts - see [extension/README.md](extension/README.md) for a permanent, signed install.
 
 ### Verify Installation
 
