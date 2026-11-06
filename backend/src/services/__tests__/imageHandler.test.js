@@ -1,31 +1,25 @@
-import { jest, describe, it, expect, beforeAll, beforeEach, afterEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
 import sharp from 'sharp';
 import { JSDOM } from 'jsdom';
 import imageHandler from '../imageHandler.js';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 
 const element = (html) => new JSDOM(html).window.document.body.firstElementChild;
 
+// Some tests download for real into the application images directory. Jest runs
+// suites in parallel in the same checkout, so this suite gets its own tree:
+// diffing a shared directory against a snapshot also deletes directories that
+// another suite created (the repeated-capture test was flaking exactly there).
+const suiteImagesDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bookmark-digest-images-'));
+imageHandler.baseImagesDir = suiteImagesDir;
+
 describe('ImageHandler', () => {
-  // Some tests download for real, straight into the application images
-  // directory. Record what was already there, then remove anything this suite
-  // creates so a test run never leaves artifacts behind.
   const imagesDir = path.resolve(imageHandler.baseImagesDir);
-  let preexisting;
 
-  beforeAll(async () => {
-    preexisting = new Set(await fs.readdir(imagesDir).catch(() => []));
-  });
-
-  afterEach(async () => {
-    const entries = await fs.readdir(imagesDir).catch(() => []);
-
-    for (const entry of entries) {
-      if (!preexisting.has(entry)) {
-        await fs.rm(path.join(imagesDir, entry), { recursive: true, force: true });
-      }
-    }
+  afterAll(async () => {
+    await fs.rm(imagesDir, { recursive: true, force: true });
   });
 
   describe('downloadAndReplaceImages', () => {
